@@ -1,0 +1,15 @@
+{
+  "name": "hooplife",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HoopLife 籃球人生 — 台灣籃球生涯模擬器（單一 HTML 檔，零外部相依）",
+  "scripts": {
+    "build": "node build-standalone.js index.html",
+    "test": "node verify.js && node regress.js && node audit.js && node smoke.js && node smoke-standalone.js index.html",
+    "test:engine": "node verify.js && node regress.js && node audit.js",
+    "test:dom": "node smoke.js && node smoke-standalone.js index.html"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

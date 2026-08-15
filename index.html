@@ -1,0 +1,3035 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="台灣籃球人生模擬器：從 HBL 一路打到 NBA，或者停在某個你沒想過的地方。">
+<meta name="theme-color" content="#12100D">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ctext%20y%3D%2252%22%20font-size%3D%2252%22%3E%F0%9F%8F%80%3C%2Ftext%3E%3C%2Fsvg%3E">
+<style>
+/* 最小 reset：artifact 主機本來會注入一份，單機版要自己帶 */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;background:var(--ground,#12100D);color:var(--ink,#F2E9D8)}
+img,svg{max-width:100%;height:auto}
+button,input,select,textarea{font:inherit;color:inherit}
+</style>
+<title>HoopLife 籃球人生</title>
+
+<style>
+/* ============================================================
+   HoopLife — 體育館電子計分板皮膚
+   bare :root = 完整深色記分板調色盤（單一視覺世界，明確上底色）
+   ============================================================ */
+:root{
+  --ground:#12100D;      /* 暖炭黑，色相偏琥珀 */
+  --panel:#1C1913;
+  --panel2:#241F17;
+  --line:#332C21;
+  --ink:#F2E9D8;
+  --muted:#9A8E79;
+  --dim:#6B6153;
+  --accent:#FFB020;      /* LED 琥珀 */
+  --accent-soft:#FFB02022;
+  --ball:#E8622C;        /* 球皮橘 */
+  --good:#57C084;
+  --warn:#E0A22B;
+  --bad:#E2564A;
+  --shadow:0 1px 0 #ffffff08, 0 10px 30px #00000055;
+  --radius:3px;
+  --fs-body:15px;
+
+  --f-sans:"PingFang TC","Noto Sans TC","Microsoft JhengHei","Hiragino Sans GB",system-ui,-apple-system,sans-serif;
+  --f-mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --f-head:var(--f-sans);
+}
+:root[data-skin="wood"]{
+  --ground:#F0E5D2; --panel:#FBF5EA; --panel2:#F5EBDA; --line:#DBC9AC;
+  --ink:#2A2118; --muted:#7C6A50; --dim:#A08F73;
+  --accent:#B5501C; --accent-soft:#B5501C18; --ball:#C9662A;
+  --good:#2F7D51; --warn:#9A6A12; --bad:#B23A2E;
+  --shadow:0 1px 0 #ffffffcc, 0 8px 22px #6d543018;
+}
+:root[data-skin="paper"]{
+  --ground:#E9E6DD; --panel:#FCFBF7; --panel2:#F4F2EA; --line:#CBC5B6;
+  --ink:#16150F; --muted:#5F5A4C; --dim:#8A8474;
+  --accent:#8C1F1F; --accent-soft:#8C1F1F14; --ball:#8C1F1F;
+  --good:#2C6B45; --warn:#8A5E10; --bad:#8C1F1F;
+  --shadow:none; --radius:0px;
+  --f-head:"Noto Serif TC","Songti TC","PMingLiU",Georgia,serif;
+}
+:root[data-fs="lg"]{ --fs-body:17px; }
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--f-sans);
+  font-size:var(--fs-body);
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+:root[data-skin="scoreboard"] body,:root:not([data-skin]) body{
+  background-image:repeating-linear-gradient(0deg,#ffffff05 0 1px,transparent 1px 3px);
+}
+button{font-family:inherit;font-size:inherit;color:inherit;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
+
+.wrap{max-width:560px;margin:0 auto;padding:0 12px 120px;}
+
+/* ---------- 記分板狀態列 ---------- */
+.board{
+  position:sticky;top:0;z-index:40;
+  margin:0 -12px 14px;padding:8px 12px 9px;
+  background:var(--panel);
+  border-bottom:1px solid var(--line);
+  box-shadow:var(--shadow);
+}
+.board-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.board-name{font-weight:800;letter-spacing:.02em;font-family:var(--f-head);}
+.board-pos{
+  font-family:var(--f-mono);font-size:.7em;font-weight:700;letter-spacing:.08em;
+  padding:1px 6px;border:1px solid var(--accent);color:var(--accent);border-radius:var(--radius);
+}
+.board-team{color:var(--muted);font-size:.82em;margin-left:auto;text-align:right;}
+.board-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+  margin-top:8px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);
+}
+.cell{background:var(--panel2);padding:5px 7px;min-width:0;}
+.cell .k{font-size:.62em;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;}
+.cell .v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:700;font-size:1.05em;line-height:1.3;}
+.cell .v .u{font-size:.6em;color:var(--muted);font-weight:400;margin-left:1px;}
+.v.hi{color:var(--accent);}
+
+.loadbar{
+  margin-top:7px;width:100%;display:block;text-align:left;padding:3px 0 0;
+  background:none;border:0;cursor:pointer;
+}
+.loadbar .lb-top{display:flex;justify-content:space-between;font-size:.66em;letter-spacing:.1em;color:var(--dim);}
+.loadbar .lb-top b{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted);letter-spacing:0;}
+.loadbar:hover .lb-top,.loadbar:hover .lb-top b{color:var(--accent);}
+.track{height:5px;background:var(--panel2);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-top:3px;}
+.fill{height:100%;transition:width .5s ease;}
+.tbtn.wide{width:100%;margin-top:7px;text-align:center;padding:5px;letter-spacing:.14em;}
+.board-btns{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px;}
+.board-btns .tbtn{width:100%;text-align:center;padding:5px 2px;letter-spacing:.08em;}
+.board-sty{
+  font-size:.66em;letter-spacing:.06em;color:var(--muted);
+  padding:1px 5px;border:1px solid var(--line);border-radius:var(--radius);
+}
+.cell .v.rl{font-size:.86em;letter-spacing:.02em;}
+.v.rl.star{color:var(--accent);} .v.rl.starter{color:var(--ink);}
+.v.rl.rotation{color:var(--muted);} .v.rl.bench{color:var(--dim);}
+
+/* 記分板展開面板 */
+.panel{
+  margin-top:8px;padding:9px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:var(--radius);
+  animation:rise .22s ease both;
+}
+.panel .attrs{margin-bottom:7px;}
+.phint{font-size:.74em;color:var(--muted);line-height:1.65;margin:7px 0 0;}
+.phint b{color:var(--ink);}
+.ledger{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.ledger h5{
+  margin:0 0 3px;font-family:var(--f-mono);font-size:.62em;letter-spacing:.14em;
+  color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:2px;
+}
+.lrow{display:flex;justify-content:space-between;gap:5px;font-size:.7em;padding:1px 0;line-height:1.5;}
+.lrow span{color:var(--muted);min-width:0;}
+.lrow b{font-family:var(--f-mono);font-variant-numeric:tabular-nums;flex:0 0 auto;}
+.lrow b.up{color:var(--bad);} .lrow b.down{color:var(--good);}
+
+/* 天生體質 */
+.dura{
+  display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-top:8px;
+  padding:5px 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
+}
+.dura .dl{font-family:var(--f-mono);font-size:.62em;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;}
+.dura b{font-weight:800;font-size:.9em;}
+.dura .dv{font-family:var(--f-mono);font-size:.68em;color:var(--muted);margin-left:auto;
+  font-variant-numeric:tabular-nums;white-space:nowrap;}
+.dura.iron b,.dura.solid b{color:var(--good);}
+.dura.normal b{color:var(--muted);}
+.dura.thin b,.dura.paper b{color:var(--bad);}
+.dura.iron,.dura.solid{border-color:color-mix(in srgb,var(--good) 40%,var(--line));}
+.dura.thin,.dura.paper{border-color:color-mix(in srgb,var(--bad) 40%,var(--line));}
+
+/* 球探報告：同儕定位 + 下一道門檻 */
+.peer{padding:2px 0 1px;}
+.peer .pr-t{font-family:var(--f-mono);font-size:.62em;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;}
+.peer .pr-v{font-size:.86em;color:var(--muted);font-variant-numeric:tabular-nums;}
+.peer .pr-v b{color:var(--accent);font-weight:800;}
+.peer .pr-v i{font-style:normal;font-size:.86em;color:var(--dim);}
+h5.sch{
+  margin:11px 0 5px;font-family:var(--f-mono);font-size:.62em;letter-spacing:.14em;
+  color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:2px;
+}
+.gate{
+  border:1px solid var(--line);border-left:2px solid var(--muted);border-radius:var(--radius);
+  padding:6px 8px;margin-bottom:6px;background:var(--panel);
+}
+.gate.ok{border-left-color:var(--good);}
+.gate.off{border-left-color:var(--dim);opacity:.72;}
+.gate .gt{display:flex;justify-content:space-between;align-items:baseline;gap:6px;flex-wrap:wrap;}
+.gate .gt b{font-size:.88em;font-weight:800;}
+.gk{font-family:var(--f-mono);font-size:.6em;letter-spacing:.1em;color:var(--dim);
+  border:1px solid var(--line);border-radius:var(--radius);padding:0 4px;flex:0 0 auto;}
+.gk.on{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,var(--line));}
+.gk.off{color:var(--dim);}
+.greq{display:flex;justify-content:space-between;gap:6px;font-family:var(--f-mono);
+  font-size:.7em;font-variant-numeric:tabular-nums;padding:1px 0;}
+.greq span{color:var(--dim);}
+.greq b.up{color:var(--good);} .greq b.down{color:var(--warn);}
+.gate .gn{font-size:.7em;color:var(--muted);margin:3px 0 0;line-height:1.55;}
+
+/* 成功率粗略帶 */
+.bd-good{color:var(--good);} .bd-mid{color:var(--muted);}
+.bd-warn{color:var(--warn);} .bd-bad{color:var(--bad);}
+.opt .odds{border:1px solid currentColor;border-radius:var(--radius);padding:0 4px;font-weight:700;}
+
+/* 季初分段：訓練強度／球季態度 */
+.seclab{
+  font-family:var(--f-mono);font-size:.64em;letter-spacing:.14em;color:var(--dim);
+  text-transform:uppercase;margin:0 0 5px;
+}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}
+.segbtn{
+  padding:6px 3px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
+  cursor:pointer;text-align:center;transition:all .15s;line-height:1.3;
+}
+.segbtn b{display:block;font-size:.84em;font-weight:700;}
+.segbtn span{
+  display:block;font-family:var(--f-mono);font-size:.6em;color:var(--dim);
+  font-variant-numeric:tabular-nums;
+}
+.segbtn[aria-pressed="true"]{border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--panel2);}
+.segbtn[aria-pressed="true"] b{color:var(--accent);}
+.segdesc{font-size:.78em;color:var(--muted);margin:0 0 8px;line-height:1.55;min-height:2.4em;}
+
+/* 即時風險條 */
+.risk{
+  background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
+  padding:7px 8px;margin-bottom:9px;
+}
+.risk-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.risk-k{font-family:var(--f-mono);font-size:.62em;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;}
+.risk-v{font-family:var(--f-mono);font-size:.78em;font-variant-numeric:tabular-nums;color:var(--muted);}
+.risk-v b{color:var(--ink);font-weight:800;}
+.risk-v i{font-style:normal;color:var(--dim);font-size:.9em;}
+.risk .track{margin-top:4px;}
+
+/* ---------- 敘事卡 ---------- */
+.log{display:flex;flex-direction:column;gap:10px;}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:11px 13px;box-shadow:var(--shadow);
+  animation:rise .32s ease both;
+}
+@keyframes rise{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:none;}}
+.card .eyebrow{
+  font-family:var(--f-mono);font-size:.66em;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--dim);display:flex;gap:8px;align-items:center;margin-bottom:5px;
+}
+.card .eyebrow b{color:var(--accent);letter-spacing:.16em;}
+.card h3{margin:0 0 5px;font-size:1.02em;font-family:var(--f-head);font-weight:800;text-wrap:balance;letter-spacing:.01em;}
+.card p{margin:0 0 6px;}
+.card p:last-child{margin-bottom:0;}
+.card.hl{border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--panel);}
+.card.bad{border-color:var(--bad);}
+.card.good{border-color:var(--good);}
+
+.stat-line{
+  font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:.9em;
+  display:flex;flex-wrap:wrap;gap:0 14px;color:var(--muted);margin-top:6px;
+  padding-top:6px;border-top:1px dashed var(--line);
+}
+.stat-line b{color:var(--ink);font-weight:700;}
+.delta{font-family:var(--f-mono);font-size:.85em;display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:7px;}
+.chip{
+  padding:1px 6px;border-radius:var(--radius);border:1px solid var(--line);
+  background:var(--panel2);font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.chip.up{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,var(--line));}
+.chip.down{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--line));}
+.chip.trait{color:var(--accent);border-color:var(--accent);font-weight:700;}
+.chip .capnote{font-style:normal;font-size:.82em;color:var(--dim);margin-left:2px;}
+.chip.mile{color:var(--accent);border-color:var(--accent);font-weight:700;
+  background:var(--accent-soft);}
+.chip.rl-star{color:var(--accent);border-color:var(--accent);}
+.chip.rl-bench{color:var(--dim);}
+/* 同儕定位（季末結算） */
+.peerline{
+  margin-top:7px;padding:4px 8px;font-family:var(--f-mono);font-size:.74em;
+  font-variant-numeric:tabular-nums;color:var(--muted);
+  border-left:2px solid var(--accent);background:var(--panel2);border-radius:var(--radius);
+}
+.peerline b{color:var(--ink);font-weight:800;}
+.peerline em{font-style:normal;color:var(--accent);font-weight:700;margin-left:6px;}
+
+/* ---------- 動作面板 ---------- */
+.dock{
+  position:sticky;bottom:0;z-index:30;
+  margin:14px -12px 0;padding:11px 12px 14px;
+  background:linear-gradient(transparent,var(--ground) 18px);
+}
+.dock-in{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:11px;box-shadow:var(--shadow);
+}
+.prompt{font-size:.94em;margin:0 0 9px;color:var(--ink);}
+.prompt .q{font-family:var(--f-mono);font-size:.72em;letter-spacing:.14em;color:var(--dim);display:block;text-transform:uppercase;margin-bottom:3px;}
+
+.opts{display:flex;flex-direction:column;gap:7px;}
+.opt{
+  display:flex;align-items:flex-start;gap:9px;width:100%;text-align:left;
+  background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
+  padding:9px 10px;cursor:pointer;transition:border-color .15s,background .15s,transform .08s;
+}
+.opt:hover:not(:disabled){border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--panel2);}
+.opt:active:not(:disabled){transform:translateY(1px);}
+.opt:disabled{opacity:.42;cursor:not-allowed;}
+.opt .tag{
+  font-family:var(--f-mono);font-size:.62em;font-weight:700;letter-spacing:.08em;
+  padding:2px 5px;border-radius:var(--radius);border:1px solid currentColor;flex:0 0 auto;margin-top:2px;
+}
+.tag.push{color:var(--bad);} .tag.norm{color:var(--muted);} .tag.safe{color:var(--good);}
+.opt .body{flex:1;min-width:0;}
+.opt .t{font-weight:700;display:block;}
+.opt .d{font-size:.83em;color:var(--muted);display:block;line-height:1.5;}
+.opt .odds{font-family:var(--f-mono);font-size:.72em;color:var(--dim);font-variant-numeric:tabular-nums;}
+
+.btn{
+  width:100%;padding:11px;border-radius:var(--radius);cursor:pointer;font-weight:800;letter-spacing:.06em;
+  background:var(--accent);color:var(--ground);border:1px solid var(--accent);
+  transition:filter .15s,transform .08s;
+}
+.btn:hover:not(:disabled){filter:brightness(1.12);}
+.btn:active:not(:disabled){transform:translateY(1px);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line);}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-row{display:flex;gap:7px;margin-top:8px;}
+
+/* ---------- 加練投籃 ---------- */
+.tray{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin:2px 0 8px;}
+.shot{
+  width:46px;flex:0 0 auto;padding:4px 2px 3px;text-align:center;
+  background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
+  position:relative;animation:pop .26s ease both;
+}
+@keyframes pop{from{opacity:0;transform:scale(.8) translateY(-4px);}to{opacity:1;transform:none;}}
+.shot .v{
+  font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:800;font-size:1.06em;
+  line-height:1.15;display:block;
+}
+.shot .r{font-size:.56em;letter-spacing:.06em;color:var(--muted);display:block;}
+.shot.swish{border-color:var(--accent);}
+.shot.swish .v,.shot.swish .r{color:var(--accent);}
+.shot.rim{opacity:.7;}
+.shot.air{opacity:.7;}
+.shot.air .v{color:var(--bad);}
+.shot.hot::after{
+  content:'';position:absolute;inset:-1px;border-radius:var(--radius);pointer-events:none;
+  box-shadow:0 0 0 1px var(--ball),0 0 9px -1px var(--ball);
+}
+.heat{
+  text-align:center;font-family:var(--f-mono);font-size:.7em;letter-spacing:.1em;
+  color:var(--ball);margin:-3px 0 8px;font-weight:700;
+}
+.heat span{color:var(--muted);font-weight:400;letter-spacing:.04em;}
+
+/* ---------- 屬性分配 ---------- */
+.pool.two{display:flex;align-items:stretch;gap:1px;background:var(--line);padding:0;text-align:left;}
+.pool.two .pl,.pool.two .pr{flex:1;background:var(--panel2);padding:6px 9px;min-width:0;}
+.pool.two .pl b{font-size:1.5em;color:var(--accent);font-weight:800;}
+.pool.two span{font-size:.62em;letter-spacing:.1em;color:var(--dim);display:block;text-transform:uppercase;}
+.pool.two .pr b{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:1.02em;
+  font-weight:700;color:var(--muted);display:block;line-height:1.5;}
+.pool.two .pr b em{font-style:normal;color:var(--ink);font-weight:800;}
+.pool.two .pr i{font-style:normal;font-family:var(--f-mono);font-size:.78em;color:var(--accent);font-weight:700;}
+.pool{
+  text-align:center;font-family:var(--f-mono);font-variant-numeric:tabular-nums;
+  margin-bottom:9px;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
+}
+.pool b{font-size:1.5em;color:var(--accent);font-weight:800;}
+.pool span{font-size:.72em;letter-spacing:.12em;color:var(--dim);display:block;text-transform:uppercase;}
+.attrs{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+.arow{display:flex;align-items:center;gap:8px;background:var(--panel2);padding:5px 8px;}
+.arow .nm{width:3.2em;flex:0 0 auto;font-size:.88em;color:var(--muted);}
+.arow .nm.key{font-weight:800;color:var(--ink);}
+.arow .bar{flex:1;height:8px;background:var(--panel);border-radius:99px;position:relative;min-width:30px;}
+.arow .bar .now{height:100%;background:var(--muted);border-radius:99px 0 0 99px;transition:width .3s;}
+.arow .bar .add{height:100%;background:var(--accent);position:absolute;top:0;transition:width .3s,left .3s;}
+/* 天賦上限刻度（灰）與目前值游標（亮）——兩根分得開，才知道自己站在哪 */
+.arow .bar .cap{
+  position:absolute;top:-3px;width:2px;height:14px;background:var(--dim);
+  transition:left .3s;border-radius:1px;
+}
+.arow .bar .cap::after{
+  content:'';position:absolute;top:-2px;left:-2px;width:6px;height:3px;
+  background:var(--dim);border-radius:1px;
+}
+.arow .bar .cur{
+  position:absolute;top:-4px;width:3px;height:16px;background:var(--ink);
+  transition:left .3s;border-radius:2px;margin-left:-1px;
+  box-shadow:0 0 0 1px var(--panel),0 0 5px -1px var(--ink);
+}
+.arow .num{
+  font-family:var(--f-mono);font-variant-numeric:tabular-nums;width:6.2em;flex:0 0 auto;
+  text-align:right;font-size:.82em;
+}
+.arow .num b{font-weight:800;color:var(--ink);}
+.arow .num i{color:var(--accent);font-style:normal;font-weight:700;}
+.arow .num u{color:var(--dim);text-decoration:none;font-size:.88em;}
+.arow .pm{display:flex;gap:3px;flex:0 0 auto;}
+.pm button{
+  width:26px;height:26px;line-height:1;padding:0;border-radius:var(--radius);cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);font-weight:800;font-family:var(--f-mono);
+}
+.pm button:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+.pm button:disabled{opacity:.3;cursor:not-allowed;}
+.maxed{color:var(--dim);font-size:.78em;}
+
+/* ---------- 開場 ---------- */
+.hero{padding:34px 0 20px;text-align:center;}
+.hero .mark{
+  font-family:var(--f-mono);font-size:.68em;letter-spacing:.34em;color:var(--accent);
+  text-transform:uppercase;margin-bottom:9px;
+}
+.hero h1{
+  margin:0;font-size:2.5em;font-weight:900;letter-spacing:-.02em;line-height:1.05;
+  font-family:var(--f-head);text-wrap:balance;
+}
+.hero .sub{color:var(--muted);margin-top:9px;font-size:.94em;}
+.hero .path{
+  font-family:var(--f-mono);font-size:.68em;color:var(--dim);margin-top:12px;letter-spacing:.02em;
+  line-height:1.9;
+}
+.field{margin-bottom:11px;}
+.field label{display:block;font-family:var(--f-mono);font-size:.68em;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-bottom:4px;}
+.field input{
+  width:100%;padding:9px 10px;background:var(--panel2);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--radius);font-family:var(--f-mono);font-size:.95em;
+}
+.field input:focus{border-color:var(--accent);outline:none;}
+.posgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;}
+.posbtn{
+  padding:8px 2px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
+  cursor:pointer;text-align:center;transition:all .15s;
+}
+.posbtn b{display:block;font-family:var(--f-mono);font-size:1.02em;font-weight:800;}
+.posbtn span{display:block;font-size:.62em;color:var(--muted);letter-spacing:.02em;}
+.posbtn[aria-pressed="true"]{border-color:var(--accent);background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--panel2);}
+.posbtn[aria-pressed="true"] b{color:var(--accent);}
+.posdesc{font-size:.82em;color:var(--muted);margin:8px 0 0;min-height:2.6em;}
+.stygrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+.stybtn{
+  padding:7px 3px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:var(--radius);cursor:pointer;font-size:.84em;font-weight:700;
+}
+.stybtn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);
+  background:linear-gradient(var(--accent-soft),var(--accent-soft)),var(--panel2);}
+
+/* ---------- 設定列 ---------- */
+.topbar{display:flex;gap:5px;justify-content:flex-end;padding:9px 0 0;flex-wrap:wrap;}
+.tbtn{
+  font-family:var(--f-mono);font-size:.64em;letter-spacing:.1em;padding:4px 7px;
+  background:transparent;border:1px solid var(--line);border-radius:var(--radius);
+  color:var(--muted);cursor:pointer;text-transform:uppercase;
+}
+.tbtn:hover,.tbtn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);}
+
+/* ---------- 生涯履歷 ---------- */
+.resume{border:1px solid var(--accent);border-radius:var(--radius);overflow:hidden;margin-top:4px;}
+.resume-hd{background:var(--accent);color:var(--ground);padding:11px 13px;}
+.resume-hd .t{font-family:var(--f-mono);font-size:.66em;letter-spacing:.3em;text-transform:uppercase;opacity:.8;}
+.resume-hd h2{margin:1px 0 0;font-size:1.35em;font-weight:900;font-family:var(--f-head);letter-spacing:.01em;}
+.resume-hd .g{font-family:var(--f-mono);font-size:.78em;font-weight:700;margin-top:2px;}
+.resume-bd{background:var(--panel);padding:12px 13px;}
+.big{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+.big.five{grid-template-columns:repeat(5,1fr);}
+.big div{background:var(--panel2);padding:7px 3px;text-align:center;min-width:0;}
+.big .n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:1.24em;font-weight:800;color:var(--accent);line-height:1.2;overflow-wrap:anywhere;}
+.big .n u{font-size:.58em;text-decoration:none;color:var(--muted);font-weight:400;}
+.big .l{font-size:.6em;letter-spacing:.08em;color:var(--dim);}
+@media (max-width:380px){ .big .n{font-size:1.05em;} }
+.sec{margin-top:13px;}
+.sec.first{margin-top:0;}
+.sec h4{
+  margin:0 0 6px;font-family:var(--f-mono);font-size:.66em;letter-spacing:.18em;color:var(--dim);
+  text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:3px;
+}
+.hnote{font-size:.7em;color:var(--dim);margin:6px 0 0;line-height:1.6;}
+
+/* 榮譽格：有拿到才亮 */
+.honors{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+.hcell{background:var(--panel2);padding:7px 3px;text-align:center;min-width:0;}
+.hcell b{
+  display:block;font-family:var(--f-mono);font-variant-numeric:tabular-nums;
+  font-size:1.24em;font-weight:800;color:var(--dim);line-height:1.2;
+}
+.hcell span{display:block;font-size:.58em;letter-spacing:.04em;color:var(--dim);}
+.hcell.on b{color:var(--accent);}
+.hcell.on span{color:var(--muted);}
+.hcell.bad b{color:var(--bad);}
+
+/* 巔峰球季 */
+.peak{border:1px solid var(--accent);border-radius:var(--radius);padding:8px 10px;background:var(--accent-soft);}
+.pk-y{font-family:var(--f-mono);font-size:.72em;letter-spacing:.06em;color:var(--muted);}
+.pk-s{display:flex;flex-wrap:wrap;gap:0 12px;margin:3px 0 2px;font-size:.8em;color:var(--muted);}
+.pk-s b{
+  font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:1.35em;
+  font-weight:800;color:var(--accent);margin-right:1px;
+}
+.pk-a{font-family:var(--f-mono);font-size:.7em;color:var(--muted);}
+
+/* 各階段足跡表 */
+.lgtab table{width:100%;border-collapse:collapse;font-size:.76em;font-variant-numeric:tabular-nums;font-family:var(--f-mono);}
+.lgtab th{
+  text-align:left;font-size:.82em;letter-spacing:.1em;color:var(--dim);font-weight:400;
+  padding:0 6px 3px 0;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+.lgtab td{padding:3px 6px 3px 0;border-bottom:1px dotted var(--line);white-space:nowrap;}
+.lgtab td.lg{color:var(--accent);font-weight:700;}
+.lgtab td.dim{color:var(--dim);}
+
+/* 逐年表：數字欄要放得下「13.2/6.2/1.4」這種兩位數，寧可換行也不能吃字 */
+.timeline{font-family:var(--f-mono);font-size:.75em;font-variant-numeric:tabular-nums;}
+.trow{display:flex;gap:7px;padding:3px 0;border-bottom:1px dotted var(--line);align-items:baseline;}
+.trow.hd{color:var(--dim);font-size:.86em;letter-spacing:.08em;border-bottom:1px solid var(--line);}
+.trow .y{color:var(--dim);flex:0 0 auto;width:4.4em;}
+.trow .y u{text-decoration:none;color:var(--line);}
+.trow .w{flex:1 1 auto;min-width:0;color:var(--muted);line-height:1.5;overflow-wrap:anywhere;}
+.trow .w em{font-style:normal;color:var(--ink);font-weight:700;}
+.trow .s{color:var(--ink);flex:0 0 auto;text-align:right;width:7.4em;overflow-wrap:anywhere;}
+.trow .s i{color:var(--dim);font-style:normal;}
+@media (max-width:400px){
+  .timeline{font-size:.7em;}
+  .trow .y{width:4em;} .trow .s{width:6.9em;}
+}
+.trow.champ .w em{color:var(--accent);}
+.trow.miss{opacity:.55;}
+.tag-aw{font-style:normal;color:var(--accent);font-size:.92em;}
+.tag-inj{font-style:normal;color:var(--bad);font-size:.88em;}
+.tag-inj.min{color:var(--warn);}
+.tw{display:flex;flex-wrap:wrap;gap:5px;}
+.scroll-x{overflow-x:auto;}
+.after{
+  border:1px solid var(--line);border-left:2px solid var(--accent);
+  border-radius:var(--radius);padding:9px 11px;margin-bottom:13px;background:var(--panel2);
+}
+.after .af-t{font-family:var(--f-mono);font-size:.62em;letter-spacing:.2em;
+  color:var(--dim);text-transform:uppercase;margin-bottom:3px;}
+.after p{margin:0;font-size:.9em;line-height:1.75;text-wrap:pretty;}
+.hof{
+  margin-top:13px;padding:11px;border:1px dashed var(--accent);border-radius:var(--radius);
+  text-align:center;background:var(--accent-soft);
+}
+.hof .v{font-family:var(--f-mono);font-size:2em;font-weight:900;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums;}
+.hof .v span{font-size:.42em;color:var(--muted);font-weight:400;}
+.hof .l{font-size:.72em;color:var(--muted);margin-top:3px;}
+.seedline{
+  font-family:var(--f-mono);font-size:.74em;color:var(--muted);text-align:center;margin-top:11px;
+  word-break:break-all;
+}
+.seedline b{color:var(--accent);}
+.toast{
+  position:fixed;left:50%;bottom:88px;transform:translateX(-50%);z-index:99;
+  background:var(--ink);color:var(--ground);padding:7px 14px;border-radius:99px;
+  font-size:.84em;font-weight:700;opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.toast.on{opacity:1;}
+.hint{font-size:.78em;color:var(--dim);margin-top:7px;line-height:1.6;}
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <button class="tbtn" data-skin-btn="scoreboard" aria-pressed="true">記分板</button>
+    <button class="tbtn" data-skin-btn="wood" aria-pressed="false">木地板</button>
+    <button class="tbtn" data-skin-btn="paper" aria-pressed="false">戰報</button>
+    <button class="tbtn" id="fsBtn" aria-pressed="false">大字</button>
+  </div>
+  <div id="app"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script id="engine">
+/* =====================================================================
+   HoopLife 引擎（純邏輯，無 DOM）
+   相同種子 ＋ 相同選擇 ＝ 相同人生：
+   所有影響狀態的亂數一律經由 g._rng，且呼叫順序固定。
+   ===================================================================== */
+
+/* ---------- 決定性亂數 ---------- */
+function cyrb128(str){
+  let h1=1779033703,h2=3144134277,h3=1013904242,h4=2773480762;
+  for(let i=0;i<str.length;i++){
+    const k=str.charCodeAt(i);
+    h1=h2^Math.imul(h1^k,597399067); h2=h3^Math.imul(h2^k,2869860233);
+    h3=h4^Math.imul(h3^k,951274213); h4=h1^Math.imul(h4^k,2716044179);
+  }
+  h1=Math.imul(h3^(h1>>>18),597399067); h2=Math.imul(h4^(h2>>>22),2869860233);
+  h3=Math.imul(h1^(h3>>>17),951274213); h4=Math.imul(h2^(h4>>>19),2716044179);
+  return (h1^h2^h3^h4)>>>0;
+}
+function mulberry32(a){
+  return function(){
+    a|=0; a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function makeSeed(rndFn){
+  const cs='abcdefghijkmnpqrstuvwxyz23456789';
+  let s=''; for(let i=0;i<8;i++) s+=cs[Math.floor(rndFn()*cs.length)];
+  return s;
+}
+
+/* ---------- 常數 ---------- */
+const ATTRS=[
+  {k:'shoot',  n:'投籃'},
+  {k:'three',  n:'三分'},
+  {k:'handle', n:'運球'},
+  {k:'pass',   n:'傳球'},
+  {k:'reb',    n:'籃板'},
+  {k:'def',    n:'防守'},
+  {k:'ath',    n:'體能'},
+  {k:'iq',     n:'球商'},
+  {k:'mind',   n:'心理'},
+];
+
+const POS={
+  PG:{n:'控球後衛',d:'球隊大腦。傳球與運球決定一切，出國門檻靠組織力與三分。',
+      w:{handle:.17,pass:.20,three:.14,shoot:.10,iq:.15,def:.09,ath:.08,mind:.07,reb:.00},h:[178,190]},
+  SG:{n:'得分後衛',d:'外線火力點。三分與投籃是命脈，最容易靠一手神射打進國際賽。',
+      w:{three:.20,shoot:.19,handle:.12,ath:.12,def:.11,iq:.08,mind:.08,pass:.06,reb:.04},h:[183,196]},
+  SF:{n:'小前鋒',  d:'全能鋒線。沒有短板就是最大長處，旅外市場最吃這一味。',
+      w:{shoot:.14,three:.14,def:.14,ath:.14,reb:.10,handle:.10,pass:.08,iq:.08,mind:.08},h:[190,203]},
+  PF:{n:'大前鋒',  d:'內外兼修的苦工。籃板與防守撐起身價，會投三分就是空間型。',
+      w:{reb:.19,def:.18,ath:.14,shoot:.12,iq:.10,three:.09,mind:.08,pass:.06,handle:.04},h:[196,208]},
+  C :{n:'中鋒',    d:'禁區屏障。籃板與防守權重最高，但膝蓋負荷也累積得最快。',
+      w:{reb:.24,def:.22,ath:.14,iq:.12,shoot:.10,mind:.08,pass:.05,handle:.03,three:.02},h:[201,216]},
+};
+
+/* bar＝這個聯盟「稱得上先發」的綜合水準，sd＝該聯盟球員實力的離散程度，
+   size＝聯盟總人數。三者只用來換算你在同儕中的排名與隊上定位，不進亂數。 */
+const LEAGUES={
+  hbl    :{n:'HBL 高中甲級',   short:'HBL',    diff:0.70,pace:1.06,pay:0,    tier:1,bar:44,sd:7.0,size:220},
+  uba    :{n:'UBA 大專甲一級', short:'UBA',    diff:0.80,pace:1.02,pay:0,    tier:2,bar:52,sd:7.0,size:170},
+  ncaa   :{n:'NCAA 一級',      short:'NCAA',   diff:1.16,pace:1.00,pay:0,    tier:6,bar:72,sd:7.5,size:4200},
+  plg    :{n:'P.LEAGUE+',      short:'PLG',    diff:1.00,pace:1.00,pay:1.0,  tier:4,bar:62,sd:6.5,size:78},
+  t1     :{n:'T1 聯盟',        short:'T1',     diff:0.96,pace:1.02,pay:0.85, tier:4,bar:60,sd:6.5,size:70},
+  bleague:{n:'日本 B.LEAGUE',  short:'B1',     diff:1.14,pace:1.00,pay:2.1,  tier:5,bar:70,sd:6.0,size:260},
+  kbl    :{n:'韓國 KBL',       short:'KBL',    diff:1.17,pace:0.97,pay:2.0,  tier:5,bar:72,sd:6.0,size:120},
+  nbl    :{n:'澳洲 NBL',       short:'NBL',    diff:1.24,pace:0.99,pay:2.6,  tier:6,bar:75,sd:5.5,size:110},
+  euro   :{n:'歐洲聯賽',       short:'EURO',   diff:1.36,pace:0.94,pay:3.4,  tier:7,bar:79,sd:5.5,size:800},
+  gleague:{n:'NBA G LEAGUE',   short:'GLG',    diff:1.30,pace:1.08,pay:1.3,  tier:7,bar:76,sd:5.5,size:380},
+  nba    :{n:'NBA',            short:'NBA',    diff:1.72,pace:1.05,pay:14.0, tier:9,bar:84,sd:5.0,size:450},
+};
+
+/* 旅外門檻：「厲害的才能出國」 */
+const OVERSEAS=[
+  {lg:'bleague',ovr:72,age:33,from:['plg','t1'],           label:'日本 B.LEAGUE'},
+  {lg:'kbl',    ovr:76,age:32,from:['plg','t1','bleague'], label:'韓國 KBL'},
+  {lg:'nbl',    ovr:79,age:32,from:['bleague','kbl','plg','t1'],label:'澳洲 NBL'},
+  {lg:'euro',   ovr:82,age:32,from:['bleague','kbl','nbl'],label:'歐洲聯賽',
+   /* 這段文案曾經寫「歐洲不會幫你敲 NBA 的門」，但 move:euro 會設 nbaRadar、
+      而且 nba.from 就含 euro——實測 606 個登陸 NBA 的人有 148 個是從歐洲過去的。
+      文案與機制不可以互相矛盾。 */
+   desc:'層級與薪水都是天花板等級，NBA 球探也在看歐洲——但那裡的薪水好到讓人不想再賭。'},
+  /* from 比對的是「當下所在聯盟」，而海外報價只在職業階段擲。
+     所以這裡不可以寫 ncaa／uba——寫了永遠不會生效，還會讓球探報告的提示文案騙人
+     （對職業球員說「要先待過…NCAA」，但他已經回不去了）。NCAA 出身走的是選秀那條路。 */
+  {lg:'gleague',ovr:78,age:30,from:['bleague','kbl','nbl','euro'],label:'NBA G LEAGUE',
+   desc:'層級與薪水都往下掉，但這是離 NBA 最近的一扇門。'},
+  {lg:'nba',    ovr:84,age:32,from:['gleague','euro','nbl'],      label:'NBA'},
+];
+
+const TRAITS={
+  genius   :{n:'天才',      good:1,d:'22 歲前加練投出 8 記空心'},
+  ironman  :{n:'鐵人',      good:1,d:'職業生涯連續 8 季全勤'},
+  latebloom:{n:'大器晚成',  good:1,d:'31 歲後綜合創生涯新高'},
+  sniper   :{n:'神射手',    good:1,d:'三分達到 90'},
+  clutch   :{n:'關鍵先生',  good:1,d:'心理 85 以上時奪冠'},
+  flyer    :{n:'空中飛人',  good:1,d:'體能達到 90'},
+  paintking:{n:'禁區之王',  good:1,d:'籃板達到 90'},
+  general  :{n:'場上將軍',  good:1,d:'傳球 88 且球商 85'},
+  lockdown :{n:'防守鐵閘',  good:1,d:'防守達到 90'},
+  captain  :{n:'更衣室領袖',good:1,d:'心理 80 以上並效力同隊 5 季'},
+  scholar  :{n:'學霸',      good:1,d:'讀完大學且球商 80'},
+  bizmind  :{n:'商業頭腦',  good:1,d:'生涯薪資累積破 8000 萬'},
+  hero     :{n:'國民英雄',  good:1,d:'國際賽單場砍下代表作'},
+  comeback :{n:'傷癒歸來',  good:1,d:'重傷後綜合回到受傷前水準'},
+  dynasty  :{n:'常勝軍',    good:1,d:'生涯冠軍達 3 座'},
+  redeem   :{n:'浪子回頭',  good:1,d:'背著更衣室毒瘤的名聲拿下總冠軍'},
+  legend   :{n:'傳奇',      good:1,d:'入選名人堂'},
+  twoway   :{n:'雙能衛',    good:1,d:'運球、三分、傳球同時 80'},
+  steel    :{n:'鋼鐵意志',  good:1,d:'負荷 85 以上仍打滿整季'},
+  streetking:{n:'街球王',   good:1,d:'高中時期兩度全力一搏且成功'},
+  motor    :{n:'永動機',    good:1,d:'體能與防守同時 85'},
+  rubber   :{n:'橡膠人',    good:1,d:'天生的，體質 88 以上就帶著出生'},
+  franchise:{n:'看板球星',  good:1,d:'在同一支球隊當了 4 季當家球星'},
+  glass    :{n:'玻璃人',    good:0,d:'生涯兩次以上重傷'},
+  brittle  :{n:'紙娃娃',    good:0,d:'天生的，體質 12 以下就帶著出生'},
+  benchwarm:{n:'萬年板凳',  good:0,d:'職業生涯累計 5 季坐在板凳末端'},
+  softheart:{n:'玻璃心',    good:0,d:'職業階段心理低於 40'},
+  cancer   :{n:'更衣室毒瘤',good:0,d:'累積三次自我中心的選擇'},
+  chucker  :{n:'獨食怪',    good:0,d:'單季場均 19 分以上但助攻不到 2'},
+  journeyman:{n:'浪人',     good:0,d:'生涯換隊 5 次以上'},
+};
+
+const HS_TEAMS=['能仁家商','松山高中','南山高中','泰山高中','東山高中','高苑工商','普門中學','光復高中','三民高中','永仁高中'];
+const UBA_TEAMS=['政治大學','國立臺灣師範大學','健行科大','輔仁大學','文化大學','臺灣藝術大學','義守大學','世新大學'];
+const PLG_TEAMS=['新北國王','桃園璞園領航猿','高雄鋼鐵人','福爾摩沙台新夢想家','臺北富邦勇士','新竹御嵿攻城獅'];
+const T1_TEAMS=['臺北台啤永豐雲豹','新北中信特攻','高雄全家海neers','臺南台鋼獵鷹','桃園台啤永豐雲豹'];
+const JP_TEAMS=['琉球黃金國王','千葉噴射機','宇都宮布雷克斯','名古屋鑽石海豚','三河海馬','廣島龍飛'];
+const KR_TEAMS=['首爾SK騎士','安養正官庄','原州DB促進者','蔚山現代威霸'];
+const AU_TEAMS=['雪梨國王','墨爾本聯合','伯斯野貓','阿德萊德36人'];
+const EU_TEAMS=['西班牙 巴斯克尼亞','德國 拜仁慕尼黑','義大利 波隆那','土耳其 貝西克塔斯','法國 摩納哥'];
+const GL_TEAMS=['聖塔克魯茲勇士','南灣湖人','德拉瓦藍衣','奧斯汀馬刺'];
+const NBA_TEAMS=['金州勇士','邁阿密熱火','丹佛金塊','奧克拉荷馬雷霆','沙加緬度國王','紐約尼克','多倫多暴龍','奧蘭多魔術'];
+
+const NAMES_A=['志','家','冠','宗','建','俊','子','承','柏','宥','品','育','思','立','偉','國','明','嘉','昱','睿'];
+const NAMES_B=['豪','翔','宇','霖','廷','安','瑋','傑','程','恩','軒','鈞','諺','德','華','凱','辰','磊','勳','丞'];
+const SURNAME=['陳','林','黃','張','李','王','吳','劉','蔡','楊','許','鄭','謝','郭','洪','曾','邱','廖','賴','周'];
+
+/* ---------- 球風：同一個位置也能有完全不同的養成方向 ---------- */
+/* grow＝該項訓練成長倍率（決定你練得動什麼）；start＝開局加成；cap＝天賦上限加成；
+   tilt＝季末數據傾斜；fav＝該球風偏好的事件（權重加倍）。 */
+const STYLES={
+  allround:{k:'allround',n:'全能型',  d:'沒有偏科。九項都練得動，也沒有任何一項特別容易突破。',
+            grow:{},start:{},cap:{},tilt:{}},
+  shooter :{k:'shooter', n:'三分射手',d:'外線是飯碗。三分與投籃長得特別快，身體與籃板吃虧。',
+            grow:{three:1.30,shoot:1.14,mind:1.06,ath:0.88,reb:0.86},
+            start:{three:5,shoot:3},cap:{three:4,shoot:2},tilt:{pts:1.07,reb:0.92}},
+  slasher :{k:'slasher',  n:'切入型',  d:'第一步吃飯。體能與運球長得快，但外線始終是罩門。',
+            grow:{ath:1.26,handle:1.18,shoot:1.04,three:0.82,pass:0.92},
+            start:{ath:4,handle:4},cap:{ath:4,handle:2},tilt:{pts:1.05,stl:1.08,three:0}},
+  floor   :{k:'floor',    n:'組織核心',d:'球隊的節拍器。傳球與球商長得快，得分手段相對單一。',
+            grow:{pass:1.30,iq:1.20,handle:1.06,reb:0.84,def:0.92},
+            start:{pass:5,iq:4},cap:{pass:4,iq:3},tilt:{ast:1.22,pts:0.94}},
+  glue    :{k:'glue',     n:'藍領防守',d:'做髒活的人。防守與籃板長得快，進攻端永遠是配角。',
+            grow:{def:1.28,reb:1.20,ath:1.06,shoot:0.86,three:0.88},
+            start:{def:5,reb:3},cap:{def:4,reb:2},tilt:{stl:1.18,blk:1.15,pts:0.90,reb:1.08}},
+  anchor  :{k:'anchor',   n:'禁區支柱',d:'把籃框守起來。籃板與防守長得快，但外線幾乎練不動。',
+            grow:{reb:1.26,def:1.18,ath:1.08,three:0.68,handle:0.82},
+            start:{reb:5,def:3},cap:{reb:4,def:2},tilt:{blk:1.28,reb:1.12,three:0}},
+};
+const STYLE_KEYS=Object.keys(STYLES);
+
+/* ---------- 隊上定位：同樣的綜合，在不同聯盟會是完全不同的角色 ---------- */
+/* u＝球權（影響得分）；sec＝籃板助攻抄截阻攻的縮放 */
+const ROLES={
+  star    :{k:'star',    n:'當家球星',u:1.35,sec:1.10,award:1.35,pay:1.34,gp:1.00,
+            d:'球權在你手上。數據、獎項與薪水都放大，但對手的重點也是你。'},
+  starter :{k:'starter', n:'先發',    u:0.85,sec:1.00,award:1.00,pay:1.00,gp:1.00,
+            d:'穩定的先發位置。打成什麼樣子，取決於你自己。'},
+  rotation:{k:'rotation',n:'輪替',    u:0.52,sec:0.72,award:0.42,pay:0.80,gp:0.96,
+            d:'上場時間看手感與對手，數據被壓縮，獎項幾乎輪不到。'},
+  bench   :{k:'bench',   n:'板凳末端',u:0.31,sec:0.52,award:0.10,pay:0.62,gp:0.82,
+            d:'多半是垃圾時間才會聽到你的名字。'},
+};
+const ROLE_ORDER=['star','starter','rotation','bench'];
+
+/* ---------- 中華隊：層級越高、名氣與海外曝光越大，門檻也越高 ---------- */
+const NATL_COMPS=[
+  {n:'瓊斯盃',       w:3,need:68,fame:8, buzz:0.6,d:'家門口的邀請賽，對手參差不齊。'},
+  {n:'亞洲盃資格賽', w:3,need:71,fame:13,buzz:1.0,d:'亞洲區的門票戰，日韓菲都在。'},
+  {n:'亞運會',       w:2,need:74,fame:17,buzz:1.4,d:'四年一次，全亞洲最高規格的綜合賽會。'},
+  {n:'世界盃資格賽', w:2,need:77,fame:21,buzz:1.9,d:'世界舞台的入場券，對手是歐美勁旅。'},
+  {n:'奧運資格賽',   w:1,need:81,fame:27,buzz:2.6,d:'最後一張船票，全世界的鏡頭都在。'},
+];
+/* 國際賽的三種打法：各看不同屬性，成功了給的東西也不一樣 */
+const NATL_PLANS=[
+  {k:'carry',n:'扛下來，球給我', kind:'push',
+   d:'關鍵球自己處理。成了就是全國轉播的代表作，砸了就是罵聲。',
+   p:g=>clamp((g.a.shoot*0.4+g.a.mind*0.35+g.a.three*0.25-52)/40,0.12,0.80)},
+  {k:'orchestrate',n:'打體系，串連全隊',kind:'norm',
+   d:'把球導出去，讓中華隊像一支球隊。穩，但鏡頭不會只給你。',
+   p:g=>clamp((g.a.pass*0.45+g.a.iq*0.40+g.a.handle*0.15-46)/38,0.18,0.86)},
+  {k:'lockdown',n:'守下對方王牌',kind:'safe',
+   d:'把最硬的活扛下來。教練與球探最愛，但數據不會漂亮。',
+   p:g=>clamp((g.a.def*0.45+g.a.ath*0.35+g.a.reb*0.20-45)/38,0.18,0.86)},
+];
+
+/* ---------- 里程碑：長生涯的追逐目標 ---------- */
+const MILESTONES=[
+  {k:'pts1k', n:'生涯 1,000 分',  v:2, f:g=>g.career.pts>=1000},
+  {k:'pts5k', n:'生涯 5,000 分',  v:3, f:g=>g.career.pts>=5000},
+  {k:'pts10k',n:'生涯 10,000 分', v:5, f:g=>g.career.pts>=10000},
+  {k:'pts20k',n:'生涯 20,000 分', v:8, f:g=>g.career.pts>=20000},
+  {k:'reb3k', n:'生涯 3,000 籃板', v:3, f:g=>g.career.reb>=3000},
+  {k:'ast3k', n:'生涯 3,000 助攻', v:3, f:g=>g.career.ast>=3000},
+  {k:'gp500', n:'生涯 500 場',    v:2, f:g=>g.career.gp>=500},
+  {k:'gp1000',n:'生涯 1,000 場',  v:4, f:g=>g.career.gp>=1000},
+  {k:'hi40',  n:'單場 40 分',     v:2, f:g=>g.career.hiGame>=40},
+  {k:'hi50',  n:'單場 50 分',     v:4, f:g=>g.career.hiGame>=50},
+  {k:'hi60',  n:'單場 60 分',     v:7, f:g=>g.career.hiGame>=60},
+  {k:'iron5', n:'連續 5 季全勤',   v:2, f:g=>g.streakFull>=5},
+  {k:'tri',   n:'場均準大三元',    v:5, f:g=>{const s=g.seasons[g.seasons.length-1];
+              return !!s&&s.gp>0&&s.pts>=15&&s.reb>=8&&s.ast>=8;}},
+  {k:'ace',   n:'單季場均 25 分',  v:4, f:g=>{const s=g.seasons[g.seasons.length-1];
+              return !!s&&s.gp>0&&s.pts>=25;}},
+];
+
+/* ---------- 小工具 ---------- */
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const r1=v=>Math.round(v*10)/10;
+function pick(rng,arr){ return arr[Math.floor(rng()*arr.length)]; }
+function ri(rng,a,b){ return a+Math.floor(rng()*(b-a+1)); }
+/* 標準常態累積機率（Abramowitz–Stegun 近似）——換算同儕排名用，純函式 */
+function normCdf(z){
+  const t=1/(1+0.2316419*Math.abs(z));
+  const d=0.3989422804014327*Math.exp(-z*z/2);
+  let p=d*t*(0.31938153+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429))));
+  return z>0?1-p:p;
+}
+/* 同儕定位：你在這個聯盟裡排第幾 */
+function peerRank(g,ovr){
+  const L=LEAGUES[g.league];
+  const above=clamp(1-normCdf((ovr-L.bar)/L.sd),0.0002,0.9998);
+  const rank=clamp(Math.round(above*L.size)+1,1,L.size);
+  const pct=rank/L.size;
+  const tier=pct<=0.02?'聯盟頂尖':pct<=0.10?'明星等級':pct<=0.30?'穩定先發'
+            :pct<=0.62?'輪替戰力':'邊緣人';
+  return {rank:rank,size:L.size,pct:pct,tier:tier,lg:L.n,short:L.short};
+}
+/* 成功率粗略帶：讓玩家知道自己在賭什麼，但不給到小數點 */
+function oddsBand(p){
+  if(p>=0.85) return {n:'幾乎穩了',k:'good'};
+  if(p>=0.62) return {n:'很有把握',k:'good'};
+  if(p>=0.42) return {n:'五五波',  k:'mid'};
+  if(p>=0.22) return {n:'賭一把',  k:'warn'};
+  if(p>=0.08) return {n:'機會渺茫',k:'bad'};
+  return {n:'幾乎不可能',k:'bad'};
+}
+
+function overall(g){
+  const w=POS[g.pos].w; let s=0;
+  for(const k in w) s+=g.a[k]*w[k];
+  return Math.round(s);
+}
+/* 天花板綜合：每一項都練到天賦上限之後會是多少。19 歲的球員還沒打出來，
+   NBA 球隊看的是這個數字，不是現值。 */
+function potOvr(g){
+  const w=POS[g.pos].w; let s=0;
+  for(const k in w) s+=(g.pot[k]==null?99:g.pot[k])*w[k];
+  return Math.round(s);
+}
+/* 球探評價：現值與天花板的加權。年級越低，球隊越只能賭天花板。
+   NBA 選秀（大一到大四）都用這一個數字，所以「早走」與「讀完」是同一把尺量的。 */
+function nbaScout(g,ovr){
+  const y=clamp(Math.round(g.stageYear),1,4);
+  const wPot=[0,0.55,0.45,0.35,0.25][y];
+  return Math.round((ovr*(1-wPot)+potOvr(g)*wPot)*10)/10;
+}
+const NBA_SCOUT_GATE=78;   /* 低於這個數字，NBA 選秀的選項根本不會出現 */
+/* 屬性加減的唯一入口：往上一律夾在天賦上限（要突破天花板得靠 res.pot 加上限），
+   往下才允許掉到 10 以下的地板。畫面上畫了刻度，就不能有任何路徑越過它。 */
+function bumpAttr(g,k,v){
+  const cap=g.pot[k]==null?99:g.pot[k];
+  const hi=v>0?Math.max(cap,g.a[k]):99;
+  const before=g.a[k];
+  g.a[k]=clamp(Math.round((g.a[k]+v)*10)/10,0,hi);
+  return Math.round((g.a[k]-before)*10)/10;   /* 回傳「實際吃進去多少」，不是名目值 */
+}
+function trait(g,k){ return g.traits.indexOf(k)>=0; }
+function addTrait(g,k){
+  if(trait(g,k)) return false;
+  g.traits.push(k); g._newTraits.push(k); return true;
+}
+
+/* ---------- 建立新生涯 ---------- */
+function createGame(seedStr,name,pos,style){
+  const rng=mulberry32(cyrb128('hooplife|'+seedStr));
+  const sty=STYLES[style]?style:'allround';
+  const g={
+    seed:seedStr,_rng:rng,
+    name:name,pos:pos,style:sty,
+    height:ri(rng,POS[pos].h[0],POS[pos].h[1]),
+    /* 天生體質：受傷這件事不該完全是選擇的結果，也要有「這局抽到什麼身體」 */
+    dura:ri(rng,0,100),
+    age:16,year:2026,
+    stage:'hs',stageYear:1,
+    league:'hbl',team:'',role:'starter',fit:'ok',
+    a:{},pot:{},
+    load:6,fame:8,money:0,natlBuzz:0,
+    seasons:[],career:{gp:0,pts:0,reb:0,ast:0,stl:0,blk:0,fg:0,tp:0,ft:0,seasons:0,hiGame:0},
+    awards:[],traits:[],natl:[],milestones:[],
+    champs:0,teamsPlayed:[],injuries:0,fullSeasons:0,streakFull:0,bestStreak:0,
+    sameTeamYears:0,starYears:0,benchYears:0,sameTeamStar:0,
+    bestOvr:0,preInjuryOvr:0,gutsyHS:0,egoCount:0,swishes:0,
+    phase:'train',pending:null,log:[],attitude:'steady',
+    _newTraits:[],_newMiles:[],flags:{},retiredWhy:'',
+  };
+  /* 起始屬性：位置傾向 + 球風加成 + 個體差 */
+  const w=POS[pos].w,ST=STYLES[sty];
+  for(const at of ATTRS){
+    const bias=(w[at.k]||0)*100;              /* 0~24 */
+    /* 上限放到 56，否則球風加成會被夾掉——加了卻沒效果比不加更糟 */
+    g.a[at.k]=clamp(Math.round(21+bias*1.0+(ST.start[at.k]||0)+ri(rng,-5,8)),8,56);
+  }
+  /* 潛力上限：整體天賦 + 球風專長 + 每項浮動 */
+  const talent=ri(rng,0,100);
+  g.talentBand=talent;
+  const base=58+Math.round(talent*0.36);      /* 58~94 */
+  for(const at of ATTRS){
+    g.pot[at.k]=clamp(base+ri(rng,-14,15)+Math.round((w[at.k]||0)*30)+(ST.cap[at.k]||0),35,99);
+  }
+  if(g.dura>=88) addTrait(g,'rubber');
+  if(g.dura<=12) addTrait(g,'brittle');
+  g._newTraits=[];                            /* 天生特質不當成「本季獲得」跳出來 */
+  g.team=pick(rng,HS_TEAMS);
+  g.teamsPlayed.push(g.team);
+  g.bestOvr=overall(g);
+  g.role=roleOf(g,overall(g));
+  g.log.push({kind:'open',title:'高一春天',
+    body:`${g.name}，${g.height} 公分，${POS[pos].n}／${ST.n}。進了 ${g.team} 籃球隊，`+
+         `球衣號碼還沒發下來，先從撿球開始。\n\n`+
+         `${duraBand(g.dura).open}`});
+  startTrain(g);
+  return g;
+}
+/* 體質分帶：玩家看得到自己抽到什麼身體，但看到的是描述不是裸數字 */
+function duraBand(v){
+  if(v>=88) return {k:'iron',  n:'鐵打的',  d:'怎麼撞都沒事的那種人。',
+    open:'體檢報告上，隊醫多看了兩眼：這副身體是鐵打的。'};
+  if(v>=68) return {k:'solid', n:'硬朗',    d:'比一般人耐撞一點。',
+    open:'隊醫說你的關節條件不錯，該練就放心練。'};
+  if(v>=33) return {k:'normal',n:'普通',    d:'跟大多數人一樣，該保養還是要保養。',
+    open:'體檢一切正常，沒有特別好也沒有特別壞。'};
+  if(v>=13) return {k:'thin',  n:'偏脆',    d:'比一般人容易出狀況。',
+    open:'隊醫皺了眉：你的腳踝比同年紀的人鬆，這種身體不能硬拚。'};
+  return {k:'paper',n:'紙糊的',d:'一撞就倒，一倒就是好幾週。',
+    open:'隊醫沉默了很久才說：你這副身體，要用一輩子的方式去打球。'};
+}
+/* 體質對受傷率的倍率。用乘法不用加法：加法只是一筆固定稅，拚不拚都繳一樣多，
+   於是「紙糊的身體不能硬拚」這件事根本不成立。乘法才會讓體質與選擇互相放大。 */
+function duraMult(g){
+  const d=g.dura==null?50:g.dura;
+  return Math.round(clamp(1+(50-d)/50*0.8,0.45,1.8)*1000)/1000;
+}
+function duraLoad(g){ return Math.round((50-(g.dura==null?50:g.dura))/50*2); }
+/* 體質也影響「受傷會不會變成重傷」。只影響次數不影響嚴重度的話，
+   紙糊的人只是比較常扭到腳，跟鐵人一樣不容易斷韌帶——那不叫紙糊。 */
+function duraSevere(g){ return clamp(1+(duraMult(g)-1)*0.5,0.7,1.4); }
+
+/* ---------- 隊上定位 ---------- */
+/* 同樣的綜合，在 PLG 是當家、在 NBA 只是輪替——這就是「我 78 綜合為什麼只有 8 分」的答案。
+   先換算成同儕標準分數，再讓名氣／順位／體系適配去推移，最後才切等級——
+   這樣球探報告上的「同儕定位」與記分板上的「隊上定位」不可能各說各話。 */
+function roleOf(g,ovr){
+  const L=LEAGUES[g.league];
+  let z=(ovr-L.bar)/L.sd;
+  z+=clamp(g.fame/50,0,2)*0.35;                     /* 名氣最多推 +0.7 個標準差 */
+  if(g.stage==='pro'&&isMinDeal(g)) z-=1.0;
+  if(g.stage==='pro'&&g.stageYear<=1&&g.flags.pickNo)
+    z+=g.flags.pickNo<=3?0.7:g.flags.pickNo<=8?0.35:0;
+  if(g.fit==='good') z+=0.45;
+  else if(g.fit==='bad') z-=0.45;
+  if(trait(g,'cancer')) z-=0.5;
+  if(trait(g,'captain')) z+=0.25;
+  if(trait(g,'hero')) z+=0.25;
+  if(z>=2.35) return 'star';
+  if(z>=1.00) return 'starter';
+  if(z>=-0.30) return 'rotation';
+  return 'bench';
+}
+/* 體系適配：換隊不再是純好處 */
+const FIT={
+  good:{n:'完美契合',grow:1.10,d:'教練把體系繞著你的長處重畫，練什麼都吃得進去。'},
+  ok  :{n:'普通',    grow:1.00,d:'不特別合，也不彆扭。'},
+  bad :{n:'格格不入',grow:0.90,d:'戰術跑起來永遠慢半拍，成長與上場時間都被拖住。'},
+};
+function rollFit(g){
+  const gp=clamp(0.30+g.a.iq/380+g.a.mind/480-(trait(g,'cancer')?0.16:0),0.10,0.62);
+  const bp=clamp(0.30-g.a.iq/460-g.a.mind/560+(trait(g,'cancer')?0.16:0),0.05,0.45);
+  const r=g._rng();
+  g.fit=r<gp?'good':(r>1-bp?'bad':'ok');
+  return g.fit;
+}
+
+/* ---------- 階段標籤 ---------- */
+function stageLabel(g){
+  if(g.stage==='hs') return '高'+['一','二','三'][g.stageYear-1];
+  if(g.stage==='uba') return '大'+['一','二','三','四'][g.stageYear-1];
+  if(g.stage==='ncaa') return 'NCAA 第 '+g.stageYear+' 年';
+  if(g.stage==='pro') return '職業第 '+g.stageYear+' 年';
+  return '退休';
+}
+function isSchool(g){ return g.stage==='hs'||g.stage==='uba'||g.stage==='ncaa'; }
+
+/* ---------- 季初：擲骰 ---------- */
+/* 加練投籃：每季 N 次出手，逐球判定，連續命中會發燙 */
+const SHOTS=[
+  {k:'swish',n:'空心',v:6,make:1},
+  {k:'make', n:'進球',v:4,make:1},
+  {k:'bank', n:'打板',v:3,make:1},
+  {k:'rim',  n:'彈框',v:1,make:0},
+  {k:'air',  n:'麵包',v:0,make:0},
+];
+const HEAT=[{s:8,m:1.55,n:'完全無視籃框'},{s:6,m:1.32,n:'手感發燙'},{s:4,m:1.16,n:'找到手感'}];
+
+function shotCount(g){
+  let n=4;
+  if(g.stage==='hs') n=6;
+  else if(g.stage==='uba'||g.stage==='ncaa') n=6;
+  else if(g.age<=23) n=5;
+  else if(g.age<=27) n=4;
+  else if(g.age<=30) n=3;
+  else n=2;
+  if(trait(g,'genius')) n+=1;
+  if(trait(g,'ironman')) n+=1;
+  if(g.load>=80) n-=1;
+  if(g.flags.injuredLast) n-=1;
+  return Math.max(1,n);
+}
+/* 手感分佈：投籃／三分／心理越好，空心與進球的比重越高 */
+function shotOdds(g){
+  const touch=(g.a.shoot*0.5+g.a.three*0.3+g.a.mind*0.2)/100;
+  const t=clamp((touch-0.5)*2,-1,1);
+  const p=[
+    clamp(0.14+t*0.07,0.04,0.30),   /* 空心 */
+    clamp(0.32+t*0.05,0.22,0.42),   /* 進球 */
+    0.26,                            /* 打板 */
+    clamp(0.19-t*0.05,0.10,0.28),   /* 彈框 */
+    clamp(0.09-t*0.07,0.01,0.20),   /* 麵包 */
+  ];
+  const sum=p.reduce((s,v)=>s+v,0);
+  return p.map(v=>v/sum);
+}
+function startTrain(g){
+  const n=shotCount(g),odds=shotOdds(g),shots=[];
+  let run=0,best=0;
+  for(let i=0;i<n;i++){
+    let r=g._rng(),idx=SHOTS.length-1;
+    for(let j=0;j<odds.length;j++){ r-=odds[j]; if(r<=0){ idx=j; break; } }
+    const s=SHOTS[idx];
+    shots.push({k:s.k,n:s.n,v:s.v,make:s.make,hot:false});
+    if(s.make){ run++; if(run>best) best=run; } else run=0;
+    if(s.k==='swish') g.swishes++;
+  }
+  /* 標出最長連續命中那一段，讓玩家看得到手感是從哪裡燒起來的 */
+  const heat=HEAT.find(h=>best>=h.s)||null;
+  if(heat){
+    let cur=0,end=-1;
+    for(let i=0;i<shots.length;i++){
+      if(shots[i].make){ cur++; if(cur===best){ end=i; break; } } else cur=0;
+    }
+    if(end>=0) for(let i=end-best+1;i<=end;i++) shots[i].hot=true;
+  }
+  if(g.age<22&&g.swishes>=8) addTrait(g,'genius');
+  const raw=shots.reduce((s,x)=>s+x.v,0);
+  g.phase='train';
+  g.pending={type:'train',shots:shots,raw:raw,streak:best,
+             heat:heat?heat.m:1,heatName:heat?heat.n:'',
+             base:Math.round(raw*(heat?heat.m:1))};
+}
+const INTENSITY={
+  push  :{k:'push',n:'全力以赴',d:'訓練點數 ×1.5，負荷 +11，訓練受傷率 16%。',mult:1.5,load:11,hurt:0.16},
+  normal:{k:'normal',n:'正常訓練',d:'照課表走。點數不變，負荷 +5，訓練受傷率 5%。',mult:1.0,load:5,hurt:0.05},
+  safe  :{k:'safe',n:'保守應對',d:'重訓改復健。點數 ×0.6，負荷 −9，訓練受傷率 1%。',mult:0.6,load:-9,hurt:0.01},
+};
+/* 球季態度：決定這一季怎麼打（影響數據、獎項機會、負荷與季中傷病） */
+const SEASON={
+  allin :{k:'allin', n:'全力衝刺',d:'搶數據、搶獎項。場均 ×1.18、獎項機會 ×1.45，負荷 +10，季中受傷率 7.5%。',
+          stat:1.18,award:1.45,load:10,hurt:0.075,gp:1.04},
+  steady:{k:'steady',n:'正常出賽',d:'照教練調度走。數據與獎項都是基準值，負荷 +5，季中受傷率 3%。',
+          stat:1.00,award:1.00,load:5, hurt:0.03,gp:1.00},
+  manage:{k:'manage',n:'控制上場時間',d:'輪休保養。場均 ×0.82、獎項機會 ×0.62，但負荷 −9，季中幾乎不會受傷。',
+          stat:0.82,award:0.62,load:-9,hurt:0.005,gp:0.86},
+};
+function trainPoints(g,intensity){
+  return Math.max(1,Math.round(g.pending.base*INTENSITY[intensity].mult));
+}
+/* 分配一點的實際成長（越接近潛力上限越難練；球風與體系適配都會放大或縮小） */
+function gainFor(g,k,already){
+  const cur=g.a[k]+already, cap=g.pot[k];
+  if(cur>=cap) return 0;
+  const room=1-Math.pow(clamp(cur/cap,0,1),2.8);
+  let ageF=1;
+  if(g.age<=18) ageF=1.2; else if(g.age<=22) ageF=1.05;
+  else if(g.age<=26) ageF=0.85; else if(g.age<=29) ageF=0.6;
+  else if(g.age<=32) ageF=0.38; else ageF=0.22;
+  const st=(STYLES[g.style]||STYLES.allround).grow[k]||1;
+  const ft=(FIT[g.fit]||FIT.ok).grow;
+  /* 最後一點只給「還塞得下」的部分：不然畫面上畫的天賦上限會被越過，
+     游標跑到刻度右邊，看起來像壞掉 */
+  return Math.min(cap-cur,Math.max(0.10,room*2.05*ageF*st*ft));
+}
+/* 預覽整批分配的結果 */
+function previewAlloc(g,alloc){
+  const out={};
+  for(const k in alloc){
+    let acc=0;
+    for(let i=0;i<alloc[k];i++) acc+=gainFor(g,k,acc);
+    out[k]=Math.round(acc*10)/10;
+  }
+  return out;
+}
+function applyTrain(g,intensity,alloc,attitude){
+  const IT=INTENSITY[intensity];
+  g.attitude=SEASON[attitude]?attitude:'steady';
+  const before=overall(g);
+  const gains=previewAlloc(g,alloc);
+  const deltas=[];
+  for(const k in gains){
+    if(gains[k]<=0) continue;
+    /* 上限夾在天賦上限，不是 99——畫面上畫了刻度就不能越過 */
+    g.a[k]=clamp(Math.round((g.a[k]+gains[k])*10)/10,0,g.pot[k]);
+    deltas.push({k:k,v:gains[k]});
+  }
+  g.load=clamp(g.load+IT.load+SEASON[g.attitude].load+(g.pos==='C'?2:0)
+               -(g.a.ath>=80?2:0)+duraLoad(g),0,100);
+  g.flags.intensity=intensity;
+
+  const card={kind:'train',title:'季初訓練 — '+IT.n,eyebrow:stageLabel(g),
+    body:trainNarrative(g,intensity)+'　'+seasonPlanNarrative(g,g.attitude),
+    deltas:deltas,ovr:[before,overall(g)]};
+
+  /* 訓練受傷判定 */
+  let hurtP=(IT.hurt+(g.load>70?0.10:0)+(g.load>88?0.14:0))*duraMult(g);
+  if(trait(g,'glass')) hurtP+=0.08;
+  if(trait(g,'steel')) hurtP-=0.04;
+  hurtP=clamp(hurtP,0,0.75);
+  if(g._rng()<hurtP){
+    const inj=doInjury(g,'train');
+    card.injury=inj;
+  }
+  g.log.push(card);
+  startEvent(g);
+  return card;
+}
+function trainNarrative(g,it){
+  const t={
+    push:['天還沒亮就到球館，最後一個關燈。','加練到手指起水泡，教練叫你回去你沒回。','重訓室的數字一週跳一次，膝蓋也一週痛一次。'],
+    normal:['照著課表走完一季，不多不少。','該練的練，該休的休，穩穩地過。','跟著隊友一起，沒有落隊也沒有超前。'],
+    safe:['把重量放下，改做恢復與柔軟度。','physio 說再拚下去就要開刀，你聽進去了。','這一季先把身體養回來。'],
+  }[it];
+  return pick(g._rng,t);
+}
+function seasonPlanNarrative(g,att){
+  return {
+    allin :'這一季你打算把自己榨乾。',
+    steady:'球季就照教練的調度走。',
+    manage:'背靠背你打算跳過幾場，把身體留到最後。',
+  }[att]||'';
+}
+
+/* ---------- 負荷與受傷風險（供 UI 即時顯示，純計算不動狀態） ---------- */
+function loadBand(v){
+  if(v>=88) return {k:'danger',n:'危險',d:'再撞一次就是手術檯。'};
+  if(v>=70) return {k:'warn',  n:'警戒',d:'受傷率明顯拉高，該考慮輪休了。'};
+  if(v>=45) return {k:'mid',   n:'累積中',d:'還撐得住，但沒有本錢再硬拚太久。'};
+  return {k:'ok',n:'輕鬆',d:'身體是乾淨的，這時候拚最划算。'};
+}
+function injuryRisk(g,intensity,attitude){
+  const IT=INTENSITY[intensity],S=SEASON[attitude]||SEASON.steady;
+  const projLoad=clamp(g.load+IT.load+S.load+(g.pos==='C'?2:0)
+                       -(g.a.ath>=80?2:0)+duraLoad(g),0,100);
+  const dm=duraMult(g);
+  let tp=(IT.hurt+(projLoad>70?0.10:0)+(projLoad>88?0.14:0))*dm;
+  if(trait(g,'glass')) tp+=0.08;
+  if(trait(g,'steel')) tp-=0.04;
+  tp=clamp(tp,0,0.75);
+  let sp=(S.hurt+(projLoad>70?0.09:0)+(projLoad>88?0.13:0))*dm;
+  if(trait(g,'glass')) sp+=0.06;
+  if(trait(g,'steel')) sp-=0.03;
+  sp=clamp(sp,0,0.6);
+  const any=1-(1-tp)*(1-sp);
+  const sevGiven=projLoad>=88?0.34:0.05;
+  return {load:projLoad,train:tp,season:sp,any:any,severe:any*sevGiven,band:loadBand(projLoad)};
+}
+/* 負荷來源／消除來源，UI 說明面板直接吃這份資料，改數值不用改文案 */
+function loadLedger(g){
+  const c=g.pos==='C'?2:0, ath=g.a.ath>=80?-2:0, dl=duraLoad(g), db=duraBand(g.dura);
+  const up=[
+    {n:'全力以赴訓練',v:'+'+INTENSITY.push.load},
+    {n:'正常訓練',   v:'+'+INTENSITY.normal.load},
+    {n:'全力衝刺球季',v:'+'+SEASON.allin.load},
+    {n:'正常出賽',   v:'+'+SEASON.steady.load},
+    {n:'中華隊集訓／國際賽',v:'+10'},
+    {n:'中鋒的禁區消耗',v:c?'+2（你是中鋒）':'+2（僅中鋒）'},
+  ];
+  const down=[
+    {n:'保守應對訓練',v:INTENSITY.safe.load},
+    {n:'控制上場時間',v:SEASON.manage.load},
+    {n:'季末自然回落',v:g.stage==='hs'?'−10':'−8'},
+    {n:'體能 80 以上的恢復力',v:ath?'−2（已生效）':'−2（體能需達 80）'},
+    {n:'受傷休養',v:'小傷 −12／重傷 −30'},
+    {n:'開刀清創（事件選項）',v:'−45'},
+  ];
+  if(dl>0) up.push({n:`天生體質「${db.n}」`,v:'+'+dl});
+  else if(dl<0) down.push({n:`天生體質「${db.n}」`,v:String(dl)});
+  const dm=duraMult(g);
+  return {
+    up:up,down:down,
+    dura:{band:db,val:g.dura,load:dl,mult:dm,
+      note:`天生體質是開局就由種子決定的，練不動也治不好。你抽到的是「${db.n}」——${db.d}`
+        +(dm===1?'受傷率不加不減，負荷累積也是基準值。'
+          :`所有受傷判定一律 ×${dm}，負荷累積 ${dl>0?'+':''}${dl}。`)
+        +(dm>1?'　乘法的意思是：你拚得越兇，體質的懲罰放大得越多——'
+              +`保守應對只有 ${(1*dm).toFixed(0)}% 上下，全力以赴會被放大到 ${Math.round(16*dm)}%。`
+             :dm<1?'　乘法的意思是：你比別人有本錢拚，同樣的全力以赴，你的受傷率只有 '
+                   +`${Math.round(16*dm)}%（一般人 16%）。`:'')},
+    rule:'負荷是永久累積的暗傷值，不會自己歸零。超過 70 每季受傷率 +9~10%；超過 88 時，一旦受傷有 34% 會直接演變成前十字韌帶或跟腱斷裂（缺一整季、體能永久掉、天賦上限也會跟著降）。',
+  };
+}
+
+/* ---------- 傷病 ---------- */
+function doInjury(g,src){
+  const roll=g._rng();
+  const sm=duraSevere(g);
+  const severe=(g.load>=88&&roll<0.34*sm)||(roll<0.05*sm);
+  if(severe){
+    g.injuries++;
+    g.preInjuryOvr=Math.max(g.preInjuryOvr,overall(g));
+    const kind=g.pos==='C'||g.pos==='PF'?'跟腱斷裂':'前十字韌帶斷裂';
+    g.a.ath=clamp(g.a.ath-ri(g._rng,7,13),10,99);
+    g.a.def=clamp(g.a.def-ri(g._rng,2,6),10,99);
+    g.a.mind=clamp(g.a.mind-ri(g._rng,0,5),10,99);
+    g.pot.ath=clamp(g.pot.ath-ri(g._rng,4,10),20,99);
+    g.load=clamp(g.load-30,0,100);
+    g.flags.injuredLast=true; g.flags.missSeason=true; g.streakFull=0;
+    if(g.injuries>=2) addTrait(g,'glass');
+    return {severe:true,text:`${kind}。手術、復健、看著隊友比賽，這一季報銷了。`};
+  }
+  const days=ri(g._rng,10,45);
+  g.a.ath=clamp(g.a.ath-ri(g._rng,1,3),10,99);
+  g.load=clamp(g.load-12,0,100);
+  g.flags.injuredLast=true; g.streakFull=0;
+  const kinds=['腳踝翻船','膝蓋積水','腰部拉傷','手指骨裂','腿後肌拉傷'];
+  return {severe:false,text:`${pick(g._rng,kinds)}，缺席約 ${days} 天。`};
+}
+
+/* ---------- 賽季中事件 ---------- */
+function eventPool(g){
+  const st=g.stage;
+  return EVENTS.filter(e=>e.st.indexOf(st)>=0
+    && (!e.once||!g.flags['ev_'+e.id])
+    && (!e.cond||e.cond(g)));
+}
+/* 球風會讓某些事件更常找上你——同一個位置，射手與禁區支柱碰到的故事不一樣 */
+function evWeight(g,e){ return (e.w||1)*(e.fav&&e.fav===g.style?2.4:1); }
+function startEvent(g){
+  if(g.flags.missSeason){ g.phase='event'; g.pending=null; startResult(g); return; }
+  const pool=eventPool(g);
+  const total=pool.reduce((s,e)=>s+evWeight(g,e),0);
+  let r=g._rng()*total,ev=pool[pool.length-1];
+  for(const e of pool){ r-=evWeight(g,e); if(r<=0){ ev=e; break; } }
+  g.phase='event';
+  /* p＝成功率（0~1）。UI 只顯示粗略帶，不給精確數字：要讓玩家知道自己在賭什麼，
+     但不變成算數學。單一來源，顯示與實際擲骰不可能對不上。 */
+  g.pending={type:'event',ev:ev.id,title:ev.t,text:typeof ev.x==='function'?ev.x(g):ev.x,
+             opts:ev.o.map(o=>({label:o.l,desc:o.d,kind:o.k,p:o.p?o.p(g):null}))};
+}
+function applyEvent(g,idx){
+  const ev=EVENTS.find(e=>e.id===g.pending.ev);
+  const opt=ev.o[idx];
+  if(ev.once) g.flags['ev_'+ev.id]=true;
+  const before=overall(g);
+  const ok=opt.p?(g._rng()<opt.p(g)):true;
+  const res=ok?opt.ok:(opt.bad||opt.ok);
+  const deltas=[];
+  /* 顯示的是實際吃進去的量，不是名目值——頂到天賦上限時寫「+3」但只加了 0 是在騙玩家 */
+  if(res.a) for(const k in res.a){
+    const v=res.a[k],got=bumpAttr(g,k,v);
+    deltas.push({k:k,v:got,capped:v>0&&got<v-0.05?v:0});
+  }
+  if(res.load) g.load=clamp(g.load+res.load,0,100);
+  if(res.fame) g.fame=clamp(g.fame+res.fame,0,100);
+  if(res.money) g.money+=res.money;
+  if(res.pot) for(const k in res.pot) g.pot[k]=clamp(g.pot[k]+res.pot[k],20,99);
+  if(res.ego) g.egoCount++;
+  if(res.gutsy) g.gutsyHS++;
+  if(res.trait) addTrait(g,res.trait);
+  if(res.flag) g.flags[res.flag]=true;
+  if(g.egoCount>=3) addTrait(g,'cancer');
+  if(g.gutsyHS>=2&&g.stage==='hs') addTrait(g,'streetking');
+
+  const card={kind:'event',title:ev.t,eyebrow:'賽季中 · '+stageLabel(g),
+    body:res.x,deltas:deltas,ok:ok,ovr:[before,overall(g)]};
+  if(res.hurt&&g._rng()<res.hurt) card.injury=doInjury(g,'event');
+  g.log.push(card);
+  startResult(g);
+  return card;
+}
+
+/* ---------- 季末：模擬數據 ---------- */
+function simSeason(g){
+  const L=LEAGUES[g.league],a=g.a,ovr=overall(g);
+  const rng=g._rng;
+  const S=SEASON[g.attitude||'steady'];
+  const R=ROLES[g.role]||ROLES.starter;
+  const ST=STYLES[g.style]||STYLES.allround;
+  const miss=g.flags.missSeason;
+  const gp=miss?0:Math.round((g.flags.injuredLast?ri(rng,22,34):(g.stage==='hs'?ri(rng,14,22):ri(rng,32,42)))
+                             *S.gp*R.gp);
+
+  if(miss){
+    return {gp:0,pts:0,reb:0,ast:0,stl:0,blk:0,hi:0,fg:0,tp:0,ft:0,
+            rec:'—',ovr:ovr,miss:true,role:g.role};
+  }
+  /* 得分是「你比這個聯盟的防守好多少」，不是你的絕對數字除以難度——
+     所以弱聯盟的當家可以砍 26 分，同一個人到 NBA 只是輪替就剩 5 分。 */
+  const off=(a.shoot*0.95+a.three*0.85+a.handle*0.45+a.ath*0.55+a.iq*0.25)/380;
+  const edge=clamp((ovr-L.bar)/L.sd,-2.6,3.6);        /* 相對同儕的標準分數 */
+  const skill=clamp(off,0.25,0.85);
+  const usage=R.u*clamp(0.86+edge*0.075,0.64,1.20);
+  let pts=(4.2+skill*11.0+Math.max(0,edge)*3.6)*usage*L.pace;
+  /* 籃板助攻抄阻仍看絕對能力，但聯盟強度只做溫和折價（不然頂級中鋒到 NBA 會消失） */
+  const d2=Math.pow(L.diff,0.55);
+  let reb=(0.8+(a.reb*0.062+a.ath*0.020)*(g.pos==='C'?1.28:g.pos==='PF'?1.14:g.pos==='SF'?0.82:0.52))/d2;
+  let ast=(0.4+(a.pass*0.045+a.iq*0.020)*(g.pos==='PG'?1.62:g.pos==='SG'?0.90:g.pos==='SF'?0.64:0.42))/d2;
+  let stl=(0.2+(a.def*0.012+a.iq*0.006)*(g.pos==='PG'||g.pos==='SG'?1.2:0.8))/d2;
+  let blk=(0.05+(a.def*0.011+a.ath*0.007)*(g.pos==='C'?1.9:g.pos==='PF'?1.2:0.45))/d2;
+  /* 副項也跟著定位縮放，不然板凳球員會刷出先發等級的籃板助攻 */
+  reb*=R.sec; ast*=R.sec; stl*=R.sec; blk*=R.sec;
+
+  if(trait(g,'chucker')) ast*=0.8;
+  if(trait(g,'sniper')) pts*=1.06;
+  /* 球風傾斜：射手多得分、組織核心多助攻、禁區支柱多阻攻 */
+  pts*=(ST.tilt.pts||1); reb*=(ST.tilt.reb||1); ast*=(ST.tilt.ast||1);
+  stl*=(ST.tilt.stl||1); blk*=(ST.tilt.blk||1);
+  /* 球季態度直接乘在場均上 */
+  pts*=S.stat; reb*=S.stat; ast*=S.stat; stl*=S.stat; blk*=S.stat;
+  const v=()=>0.86+rng()*0.28;
+  pts=Math.max(0,pts*v()); reb=Math.max(0,reb*v()); ast=Math.max(0,ast*v());
+  stl=Math.max(0,stl*v()); blk=Math.max(0,blk*v());
+  /* 場均得分不設軟上限：滿天賦球員賴在弱聯盟刷到 50 分是刻意允許的結果
+     （這是「留在小池塘當大魚」這條路線該有的回報，勿再加 KNEE/ASYM 之類的壓縮） */
+
+  /* 命中率：投籃／三分／罰球，聯盟越強越難投 */
+  const dz=L.diff-1;
+  const fg=clamp(0.362+(a.shoot*0.5+a.ath*0.3+a.iq*0.2)/100*0.200-dz*0.052
+                 +(rng()-0.5)*0.035,0.29,0.63);
+  const tp=clamp(0.238+a.three/100*0.225-dz*0.055+(rng()-0.5)*0.055,0.12,0.48);
+  const ft=clamp(0.500+(a.shoot*0.6+a.mind*0.4)/100*0.420+(rng()-0.5)*0.05,0.40,0.95);
+  /* 單季最高得分：里程碑「單場 40／50／60 分」看這個 */
+  /* 單場最高：場均越高的人，爆發倍率越低（大量出手的人本來就每場都在高檔） */
+  const hiMult=1.66+rng()*0.78-clamp((pts-18)/40,0,0.38);
+  const hi=gp>0?Math.min(99,Math.round(pts*hiMult+rng()*4)):0;
+
+  /* 球隊戰績：自身實力 + 隊友（亂數） */
+  const teamStr=clamp((ovr-50)/50,0,1)*0.42+rng()*0.58;
+  const total=g.stage==='hs'?18:(g.stage==='uba'?16:gp);
+  const win=clamp(Math.round(total*(0.28+teamStr*0.52)),0,total);
+  return {gp:gp,pts:r1(pts),reb:r1(reb),ast:r1(ast),stl:r1(stl),blk:r1(blk),hi:hi,
+          fg:Math.round(fg*1000)/10,tp:Math.round(tp*1000)/10,ft:Math.round(ft*1000)/10,
+          w:win,l:total-win,rec:win+'勝'+(total-win)+'敗',ovr:ovr,teamStr:teamStr,role:g.role};
+}
+
+function startResult(g){
+  const rng=g._rng;
+  /* 季中傷病：由球季態度、當前負荷與天生體質決定 */
+  let midInjury=null;
+  if(!g.flags.missSeason){
+    const S=SEASON[g.attitude||'steady'];
+    let p=(S.hurt+(g.load>70?0.09:0)+(g.load>88?0.13:0))*duraMult(g);
+    if(trait(g,'glass')) p+=0.06;
+    if(trait(g,'steel')) p-=0.03;
+    if(rng()<clamp(p,0,0.6)) midInjury=doInjury(g,'season');
+  }
+  /* 這一季你在隊上是什麼角色——要在模擬數據之前定下來 */
+  g.role=roleOf(g,overall(g));
+  const s=simSeason(g);
+  const R=ROLES[g.role];
+  const before=overall(g);
+  const awards=[];
+  const card={kind:'result',title:g.year+' 球季結算',eyebrow:stageLabel(g)+' · '+LEAGUES[g.league].n,
+    stats:s,awards:awards,deltas:[],team:g.team,attitude:g.attitude||'steady',
+    role:g.role,fit:g.fit,peer:peerRank(g,s.ovr)};
+  if(midInjury) card.injury=midInjury;
+
+  if(s.miss){
+    card.body=`整季報銷。${g.name}在場邊看完了 ${g.team} 的每一場比賽。`;
+    g.flags.missSeason=false;
+  }else{
+    /* 出賽全勤 */
+    if(!g.flags.injuredLast){ g.fullSeasons++; g.streakFull++; }
+    if(g.streakFull>=8&&g.stage==='pro') addTrait(g,'ironman');
+    if(g.load>=85&&!g.flags.injuredLast) addTrait(g,'steel');
+
+    /* 隊上定位累計（看板球星／萬年板凳） */
+    if(g.stage==='pro'){
+      if(g.role==='star'){ g.starYears++; g.sameTeamStar++; if(g.sameTeamStar>=4) addTrait(g,'franchise'); }
+      else g.sameTeamStar=0;
+      if(g.role==='bench'){ g.benchYears++; if(g.benchYears>=5) addTrait(g,'benchwarm'); }
+    }
+    /* 獎項：球季態度與隊上定位一起放大或縮小整體得獎機會 */
+    const ovr=s.ovr;
+    const AW=SEASON[g.attitude||'steady'].award*R.award;
+    const champ=rng()<clamp((s.teamStr-0.52)*1.5,0,0.55);
+    if(champ){
+      g.champs++;
+      const tt=g.stage==='hs'?'HBL 冠軍':g.stage==='uba'?'UBA 冠軍':LEAGUES[g.league].short+' 總冠軍';
+      awards.push(tt); card.champ=true;
+      if(g.a.mind>=85) addTrait(g,'clutch');
+      if(rng()<clamp((ovr-62)/45,0,0.7)) awards.push('總冠軍賽 MVP');
+      if(g.champs>=3) addTrait(g,'dynasty');
+      /* 原本這裡發的是「傷癒歸來」，而且條件掛在一個根本沒定義的 redeem 特質上
+         （trait() 永遠回傳 false）。毒瘤奪冠跟傷癒歸來是兩回事，改發浪子回頭。 */
+      if(trait(g,'cancer')) addTrait(g,'redeem');
+    }
+    /* 態度與定位的加成一律夾住上限，避免「當家＋全力衝刺」變成年年保送 */
+    const awp=p=>clamp(p*AW,0,0.92);
+    if(ovr>=76&&rng()<awp(clamp((ovr-72)/40,0,0.6))) awards.push('年度第一隊');
+    else if(ovr>=66&&rng()<awp(0.24)) awards.push('年度第二隊');
+    if(ovr>=82&&rng()<awp(clamp((ovr-80)/34,0,0.42))) awards.push(LEAGUES[g.league].short+' 年度 MVP');
+    if(g.stage==='pro'&&g.stageYear===1&&ovr>=64&&rng()<awp(0.5)) awards.push('年度新人');
+    if(s.pts>=(g.league==='nba'?31:28)&&rng()<0.5) awards.push('得分王');
+    if(s.reb>=(g.league==='nba'?10:11)&&rng()<0.5) awards.push('籃板王');
+    if(s.ast>=(g.league==='nba'?7.5:8)&&rng()<0.5) awards.push('助攻王');
+    if(ovr>=80&&s.gp>0&&rng()<awp(0.4)) awards.push('防守第一隊');
+
+    g.awards.push(...awards.map(x=>({y:g.year,t:x,lg:LEAGUES[g.league].short})));
+    g.fame=clamp(g.fame+awards.length*4+(champ?7:0)+clamp((s.pts-8)*0.5,0,7),0,100);
+
+    /* 累計 */
+    g.career.gp+=s.gp; g.career.seasons++;
+    g.career.pts+=s.pts*s.gp; g.career.reb+=s.reb*s.gp;
+    g.career.ast+=s.ast*s.gp; g.career.stl+=s.stl*s.gp; g.career.blk+=s.blk*s.gp;
+    g.career.fg+=s.fg*s.gp; g.career.tp+=s.tp*s.gp; g.career.ft+=s.ft*s.gp;
+    if(s.hi>g.career.hiGame) g.career.hiGame=s.hi;
+    if(g.streakFull>g.bestStreak) g.bestStreak=g.streakFull;
+
+    /* 薪水：隊上定位直接反映在合約上 */
+    if(LEAGUES[g.league].pay>0){
+      const pay=Math.round((60+Math.pow(clamp(ovr-45,0,55),1.72)*1.15)*LEAGUES[g.league].pay
+                 *(1+g.fame/160)*(1+(trait(g,'bizmind')?0.1:0))*R.pay*(isMinDeal(g)?0.3:1));
+      g.money+=pay; card.pay=pay; card.minDeal=isMinDeal(g);
+    }
+    card.body=seasonNarrative(g,s,champ,awards);
+  }
+
+  g.seasons.push({y:g.year,age:g.age,lg:LEAGUES[g.league].short,team:g.team,stage:stageLabel(g),
+                  ovr:s.ovr,pts:s.pts,reb:s.reb,ast:s.ast,stl:s.stl||0,blk:s.blk||0,
+                  fg:s.fg||0,tp:s.tp||0,ft:s.ft||0,
+                  hi:s.hi||0,gp:s.gp,rec:s.rec||'—',pay:card.pay||0,att:g.attitude||'steady',
+                  role:g.role,load:Math.round(g.load),
+                  injury:card.injury?(card.injury.severe?'severe':'minor'):null,
+                  awards:awards.slice(),champ:!!card.champ,miss:!!s.miss});
+  /* 屬性特質檢查（要在本季寫進 seasons 之後，獨食怪才看得到當季數據） */
+  checkAttrTraits(g);
+  /* 里程碑：長生涯的追逐目標（同樣要在本季寫進 seasons 之後） */
+  card.miles=checkMilestones(g);
+  /* 老化 */
+  ageDecline(g,card);
+  /* 負荷自然回落：要讓「正常訓練＋正常出賽」大致打平，負荷才會是可經營的資源，
+     而不是打久了必定爆表、後期怎麼選都在高風險區的倒數計時器 */
+  g.load=clamp(g.load-(g.stage==='hs'?10:8)-(g.a.ath>=85?2:0),0,100);
+  const nowOvr=overall(g);
+  if(nowOvr>g.bestOvr){ g.bestOvr=nowOvr; if(g.age>=31) addTrait(g,'latebloom'); }
+  if(g.preInjuryOvr>0&&nowOvr>=g.preInjuryOvr) addTrait(g,'comeback');
+  card.ovr=[before,nowOvr];
+  card.newTraits=g._newTraits.slice(); g._newTraits=[];
+  g.log.push(card);
+
+  g.flags.injuredLast=false;
+  g.phase='result';
+  g.pending={type:'result'};
+}
+/* 里程碑：只回報這一季新解鎖的 */
+function checkMilestones(g){
+  const got=[];
+  for(const m of MILESTONES){
+    if(g.milestones.indexOf(m.k)>=0) continue;
+    if(m.f(g)){ g.milestones.push(m.k); got.push(m); }
+  }
+  return got.map(m=>({k:m.k,n:m.n}));
+}
+function seasonNarrative(g,s,champ,aw){
+  const rng=g._rng;
+  if(champ) return pick(rng,[`終場哨響，${g.team} 的板凳全空了。你站在人堆最中間。`,
+    `${g.team} 拿下冠軍。回程遊行的車上，你一句話都說不出來。`,
+    `冠軍。這一年所有的加練，在最後一節全部兌現。`]);
+  if(aw.length) return pick(rng,[`個人數據漂亮，球隊沒走到最後。${s.rec}。`,
+    `你被寫進賽季回顧，但獎盃在別人手上。`]);
+  if(g.role==='bench') return pick(rng,[`名單上有你，輪表上沒有。多數夜晚你在計時器倒數時才脫掉外套。`,
+    `這一季你練球比比賽認真，因為只有練球才上得了場。`]);
+  if(g.role==='star') return pick(rng,[`球隊圍著你打。贏球是你的功勞，輸球也是。`,
+    `每一場的第一個戰術都是給你的。${s.rec}。`]);
+  if(s.pts<6) return pick(rng,[`上場時間零碎，多數時候在板凳上背戰術。`,`這一季你在輪替邊緣浮沉。`]);
+  return pick(rng,[`一個不特別也不難堪的球季。`,`${s.rec} 收場，例行公事的一年。`,`數據平穩，教練說你「可以再多要一點球」。`]);
+}
+function checkAttrTraits(g){
+  const a=g.a;
+  if(a.three>=90) addTrait(g,'sniper');
+  if(a.ath>=90) addTrait(g,'flyer');
+  if(a.reb>=90) addTrait(g,'paintking');
+  if(a.def>=90) addTrait(g,'lockdown');
+  if(a.pass>=88&&a.iq>=85) addTrait(g,'general');
+  if(a.handle>=80&&a.three>=80&&a.pass>=80) addTrait(g,'twoway');
+  if(a.ath>=85&&a.def>=85) addTrait(g,'motor');
+  if(g.money>=8000) addTrait(g,'bizmind');
+  if(g.stage==='pro'&&a.mind<40) addTrait(g,'softheart');
+  if(g.sameTeamYears>=5&&a.mind>=80) addTrait(g,'captain');
+  if(g.teamsPlayed.length>=5) addTrait(g,'journeyman');
+  const last=g.seasons[g.seasons.length-1];
+  if(last&&last.pts>=19&&last.ast<2) addTrait(g,'chucker');
+}
+function ageDecline(g,card){
+  if(g.age<28) return;
+  const rng=g._rng;
+  const sev=(g.age-27)*0.42+(g.load>70?0.9:0)+(trait(g,'glass')?0.7:0)+(g.age>=34?1.2:0);
+  const drops=[];
+  const athD=-(0.6+rng()*sev*0.9);
+  g.a.ath=clamp(Math.round((g.a.ath+athD)*10)/10,10,99); drops.push({k:'ath',v:r1(athD)});
+  if(g.age>=30){
+    const dD=-(0.3+rng()*sev*0.5);
+    g.a.def=clamp(Math.round((g.a.def+dD)*10)/10,10,99); drops.push({k:'def',v:r1(dD)});
+  }
+  if(g.age>=32){
+    const rD=-(0.3+rng()*sev*0.45);
+    g.a.reb=clamp(Math.round((g.a.reb+rD)*10)/10,10,99); drops.push({k:'reb',v:r1(rD)});
+    const hD=-(0.2+rng()*sev*0.4);
+    g.a.handle=clamp(Math.round((g.a.handle+hD)*10)/10,10,99); drops.push({k:'handle',v:r1(hD)});
+  }
+  if(g.age>=29&&!trait(g,'latebloom')){
+    bumpAttr(g,'iq',0.4);
+  }
+  /* 35 歲後手感與組織力也開始掉——不然傳球／三分／球商權重高的控衛永遠不會老 */
+  if(g.age>=35){
+    for(const k of ['shoot','three','pass','iq','mind']){
+      const d=-(0.25+rng()*sev*0.32);
+      g.a[k]=clamp(Math.round((g.a[k]+d)*10)/10,10,99); drops.push({k:k,v:r1(d)});
+    }
+  }
+  card.decline=drops;
+}
+
+/* ---------- 進入下一年（含分岔） ---------- */
+function advance(g){
+  const br=nextBranch(g);
+  if(br){ g.phase='branch'; g.pending=br; return; }
+  stepYear(g);
+}
+function stepYear(g){
+  g.age++; g.year++;
+  g.stageYear++;
+  g.sameTeamYears++;
+  startTrain(g);
+}
+
+/* 判斷這個季末要不要跳出抉擇 */
+function nextBranch(g){
+  const ovr=overall(g);
+  /* 高三畢業 */
+  if(g.stage==='hs'&&g.stageYear===3) return branchHSGrad(g,ovr);
+  /* 大四畢業 / NCAA 結束 */
+  if(g.stage==='uba'&&g.stageYear===4) return branchDraft(g,ovr,'大學畢業');
+  if(g.stage==='ncaa'&&g.stageYear===4) return branchDraft(g,ovr,'NCAA 生涯結束');
+  /* NCAA：大一打完就能宣告投入 NBA 選秀（現實的 one-and-done 規則——
+     年滿 19 歲且離開高中滿一年即具資格）。而且每一年都能重新決定，不是一次性的。 */
+  if(g.stage==='ncaa'&&g.stageYear>=1&&g.stageYear<=3&&nbaScout(g,ovr)>=NBA_SCOUT_GATE){
+    const yn=['','大一','大二','大三'][g.stageYear];
+    const opts=[{label:'宣告投入 NBA 選秀',
+      desc:(g.stageYear===1?'一年即走。':'')+'中選就直接站上最高殿堂；落選就失去學生資格，只能從 G League 打起。',
+      kind:'push',act:'nbaDraft',p:draftOdds(g,'nbaDraft')}];
+    if(g.stageYear>=2) opts.push({label:'回台灣投國內選秀',
+      desc:'放棄剩下的學業，回 P.LEAGUE+ 當即戰力。穩，但天花板也就到這裡。',
+      kind:'norm',act:'earlyDraft',p:draftOdds(g,'earlyDraft')});
+    opts.push({label:'留在學校再練一年',desc:'多一年養成，球探評價也會跟著漲。明年還能再決定一次。',kind:'safe',act:'stay'});
+    return {type:'branch',title:`${yn}結束，要宣告參加選秀嗎？`,
+      text:`球探把報告攤在桌上：現值綜合 ${ovr}、天花板 ${potOvr(g)}，`+
+           `他們給你的評價是 ${nbaScout(g,ovr)}。\n\n`+
+           (g.stageYear===1
+             ? '「你現在還不成熟，但十九歲的天花板本身就是商品。要嘛現在賣，要嘛賭它三年後還在。」'
+             : '「每多讀一年，你的天花板就少一分想像空間，多一分證據。哪一種比較值錢，沒有人說得準。」'),
+      opts:opts};
+  }
+  /* UBA：大二／大三提前投入國內選秀（UBA 打不到 NBA 球探的名單） */
+  if(g.stage==='uba'&&g.stageYear>=2&&ovr>=72&&!g.flags.askedEarly){
+    g.flags.askedEarly=true;
+    return {type:'branch',title:'提前投入選秀？',
+      text:`才${g.stageYear==2?'大二':'大三'}，經紀人已經找上門：「你現在的行情就是首輪，再讀兩年風險太大。」`,
+      opts:[
+        {label:'放棄學業，投入選秀',desc:'立刻進職業，少兩年養成但早兩年領薪水。',kind:'push',act:'earlyDraft',
+         p:draftOdds(g,'earlyDraft')},
+        {label:'讀完再說',desc:'留在校隊把身體與球商練滿，畢業再投。',kind:'safe',act:'stay'},
+      ]};
+  }
+  /* 職業：先看還有沒有人要，再看合約與國家隊，最後才問要不要自己收山 */
+  if(g.stage==='pro'){
+    const r=retireForced(g,ovr);
+    if(r) return r;
+    const os=overseasOffer(g,ovr);
+    if(os) return os;
+    const fa=contractBranch(g,ovr);
+    if(fa) return fa;
+    const nt=natlBranch(g,ovr);
+    if(nt) return nt;
+    const rq=retireQuestion(g,ovr);
+    if(rq) return rq;
+  }
+  return null;
+}
+
+/* 選秀／測試的成功率：顯示與實際擲骰共用這一份，不可能對不上 */
+function draftOdds(g,act){
+  const ovr=overall(g);
+  /* NBA 選秀：用球探評價（現值＋天花板）而不是純現值。
+     再扣一個「生嫩折價」——大一走的人身上還有三年沒打過的球，球隊要多賭一點。 */
+  if(act==='nbaDraft'){
+    const y=clamp(Math.round(g.stageYear),1,4);
+    return clamp((nbaScout(g,ovr)-79)/16-(4-y)*0.04,0.03,0.72);
+  }
+  if(act==='tryJapan') return clamp((ovr-72)/22,0.1,0.7);
+  if(act==='goDraft'||act==='goDraftT1'||act==='earlyDraft')
+    return clamp((ovr-46)/16-(g.stage==='hs'?0.35:0),0.03,0.97);
+  return null;
+}
+function branchHSGrad(g,ovr){
+  const opts=[];
+  if(ovr>=64&&g.a.iq>=55){
+    opts.push({label:'挑戰美國 NCAA',desc:'球探看上你了。語言、體格、上場時間全部歸零重來，但那是通往 NBA 最近的路。',kind:'push',act:'goNCAA'});
+  }
+  opts.push({label:'升上 UBA 大專聯賽',desc:'四年養成，球商與身體都能補完，也拿得到文憑。',kind:'norm',act:'goUBA'});
+  if(ovr>=64){
+    opts.push({label:'高中畢業直接投入職籃選秀',desc:'放棄大學，18 歲挑戰 P.LEAGUE+／T1。早四年領薪水，但基本功可能永遠補不回來。',
+      kind:'push',act:'goDraft',p:draftOdds(g,'goDraft')});
+  }
+  if(!g.flags.gapYear)
+    opts.push({label:'先當替代役，一邊打業餘聯賽',desc:'保底路線。多一年準備，隔年再投選秀。',kind:'safe',act:'gap'});
+  return {type:'branch',title:'高中畢業',
+    text:`HBL 打完了。${g.name}的高中三年結束在這裡，接下來要選一條路。`+
+         (ovr>=64?'（球探報告：綜合 '+ovr+'，有海外球探留下聯絡方式。）':'（球探報告：綜合 '+ovr+'。）'),
+    opts:opts};
+}
+function branchDraft(g,ovr,why){
+  const opts=[];
+  /* 大四的 NBA 選秀跟大一到大三共用同一把尺（球探評價），不然會出現
+     「大三 87 有七成、大四 86 只剩五趴」這種說不通的斷崖 */
+  if(g.stage==='ncaa'&&nbaScout(g,ovr)>=NBA_SCOUT_GATE){
+    opts.push({label:'投入 NBA 選秀',desc:'四年打完了，球探看的是你已經證明的東西。落選就得從 G League 打起。',
+      kind:'push',act:'nbaDraft',p:draftOdds(g,'nbaDraft')});
+  }
+  opts.push({label:'投入 P.LEAGUE+ 選秀',desc:'國內最高殿堂。順位取決於你的綜合評價與名氣。',
+    kind:'norm',act:'goDraft',p:draftOdds(g,'goDraft')});
+  opts.push({label:'投入 T1 聯盟選秀',desc:'競爭略小，上場時間通常更多。',
+    kind:'norm',act:'goDraftT1',p:draftOdds(g,'goDraftT1')});
+  if(ovr>=74) opts.push({label:'直接挑戰日本 B.LEAGUE 測試',desc:'跳過國內，直接應徵亞洲外籍名額。門檻高，失敗就只能回台灣補選。',
+    kind:'push',act:'tryJapan',p:draftOdds(g,'tryJapan')});
+  return {type:'branch',title:why,
+    text:`${g.name}，${g.age} 歲，綜合 ${ovr}。該決定往哪裡去了。`,opts:opts};
+}
+/* 市場價值：還有沒有球隊願意開合約，由實力扣掉年齡折價與傷病史、再加名氣決定。
+   年齡折價是超線性的，所以巔峰球員可以打到 41、42 歲，普通球員 36、37 歲就沒行情——
+   而不是不管你多強，一律 38 歲砍掉。 */
+function marketValue(g,ovr){
+  /* 乘法折價：年齡砍掉的是「你剩下多少價值」的比例，不是固定分數。
+     所以綜合 82 的 39 歲老將還有行情，綜合 62 的 37 歲就沒人要。 */
+  const f=g.age<=31?1:Math.max(0.15,1-Math.pow(g.age-31,1.5)*0.019);
+  return ovr*f-g.injuries*3+clamp(g.fame/10,0,6);
+}
+const MARKET_FLOOR=52;   /* 低於這個數字＝沒有球隊願意給合約 */
+/* 強制退休：沒有人開價了 */
+function retireForced(g,ovr){
+  const mv=marketValue(g,ovr);
+  const washed=ovr<52&&g.age>=27;
+  const broken=g.injuries>=3&&g.age>=31&&ovr<58;
+  /* 強制退休只留給「真的沒人要」的人。還打得動就一定是玩家自己決定，
+     不會出現「拿完年度第一隊，隔年被系統裁掉」這種事。 */
+  const noMarket=mv<MARKET_FLOOR&&g.age>=30&&ovr<70;
+  const hardCap=g.age>=42;
+  if(!(washed||broken||noMarket||hardCap)) return null;
+  g.retiredWhy=washed?'washed':broken?'broken':hardCap?'age':'nomarket';
+  return {type:'branch',title:'生涯的終點',
+    text:broken?`第 ${g.injuries} 次大傷之後，醫生把話說得很白：再撞一次，以後走路都有問題。`
+       :washed?`合約到期。經紀人打了一輪電話，沒有一支球隊願意給訓練營名額。`
+       :hardCap?`${g.age} 歲。你已經比隊上一半的人年長二十歲，該讓位了。`
+               :`${g.age} 歲。休賽季過了一半，電話沒有響過。`,
+    opts:[{label:'宣布退休',desc:'把球衣掛起來。',kind:'norm',act:'retire'}]};
+}
+/* 行情掉到底薪線以下、但實力還在：這是選擇題，不是判決 */
+function isMinDeal(g){
+  return g.stage==='pro'&&marketValue(g,overall(g))<MARKET_FLOOR;
+}
+/* 自願退休詢問：還有行情，但你自己要決定打到什麼時候（優先度最低，不會擋掉合約與國家隊） */
+function retireQuestion(g,ovr){
+  const mv=marketValue(g,ovr);
+  if(g.age<33) return null;
+  if(g.flags.retireAskYear===g.year) return null;
+  const min=mv<MARKET_FLOOR;                 /* 只剩底薪約 */
+  const elite=mv>=MARKET_FLOOR+12;
+  /* 行情還很好的人每兩年問一次就好，免得年年被打斷 */
+  if(elite&&(g.age<36||g.age%2===1)) return null;
+  g.flags.retireAskYear=g.year;
+  const last=g.seasons[g.seasons.length-1];
+  const hl=last&&last.awards.length?`上一季你還拿了${last.awards[0]}，`:'';
+  return {type:'branch',
+    title:min?'只剩底薪約了':elite?'還想打到什麼時候':'該掛鞋了嗎',
+    text:min
+      ? `${g.age} 歲。${hl}但市場很誠實：開給你的只剩底薪短約，沒有一支保證上場時間。`
+      : elite
+      ? `${g.age} 歲，${hl}身體還撐得住，合約也還談得到。但你開始會在客場飯店醒來想「值得嗎」。`
+      : `${g.age} 歲。${hl}合約談不到理想價碼，每天早上腳踩到地板的第一步都在提醒你。`,
+    opts:[
+      {label:min?'簽底薪，再打一年':'再打一年',
+       desc:min?'薪水砍到剩三成、上場時間也會變少，但你還想穿著球衣。'
+              :elite?'體能還是會掉，但你還沒準備好聽最後一次歡呼。':'你還想再聽一次全場叫你的名字。',
+       kind:'push',act:'stay'},
+      {label:'宣布退休',desc:'在還能好好走路的時候離開。',kind:'safe',act:'retire'},
+    ]};
+}
+function overseasOffer(g,ovr){
+  const last=g.seasons[g.seasons.length-1];
+  if(!last||last.miss) return null;
+  const cur=LEAGUES[g.league].tier;
+  /* 依固定順序逐一擲判定（維持種子重現性），把過關的報價全部收集起來 */
+  /* 國際賽曝光的真正價值：球探在國際賽看過你，門檻可以放寬一點點。
+     只加在機率上沒有用——機率每季重擲，長生涯下來遲早會過，等於沒差別。 */
+  const buzz=clamp(g.natlBuzz,0,5);
+  const eff=ovr+buzz*1.0;
+  const offers=[];
+  for(const o of OVERSEAS){
+    if(LEAGUES[o.lg].tier<=cur) continue;
+    if(eff<o.ovr||g.age>o.age) continue;
+    if(o.from.indexOf(g.league)<0) continue;
+    if(o.lg==='nba'&&!g.flags.nbaRadar) continue;
+    const chance=clamp((eff-o.ovr)/11+g.fame/150+buzz*0.04
+                       +(trait(g,'hero')?0.2:0),0.24,0.96);
+    if(g._rng()>chance) continue;
+    offers.push(o);
+  }
+  if(!offers.length) return null;
+  /* 同時有多張，讓玩家自己挑；NBA 一出現就壓過其他所有選項 */
+  const nba=offers.find(o=>o.lg==='nba');
+  const shortlist=nba?[nba]:offers.sort((a,b)=>LEAGUES[b.lg].tier-LEAGUES[a.lg].tier).slice(0,2);
+  const many=shortlist.length>1;
+  return {type:'branch',title:many?'兩張海外報價':'海外報價',
+    text:many
+      ? `經紀人把兩份合約攤在桌上：${shortlist.map(o=>o.label).join('、')}。綜合 ${ovr}、名氣 ${Math.round(g.fame)}，兩邊的門檻你都過了。`
+      : `${shortlist[0].label} 的球隊透過經紀人遞出合約。綜合 ${ovr}、名氣 ${Math.round(g.fame)}，你的門檻剛好過了。`
+        +(nba?'\n\n這是那扇門。走進去，或者一輩子想像它。':''),
+    opts:shortlist.map(o=>({
+      label:many?`簽 ${o.label}`:'簽下去，出國',
+      desc:o.desc||`前往 ${o.label}。競爭強度大幅提高，數據會變難看，但這是天花板。`,
+      kind:'push',act:'move:'+o.lg,
+    })).concat([
+      {label:'留下',desc:'待在熟悉的聯盟當老大，薪水穩、上場時間穩。',kind:'safe',act:'stayHome'},
+    ])};
+}
+function contractBranch(g,ovr){
+  if(g.sameTeamYears<3||g.flags.faCooldown>0){ if(g.flags.faCooldown>0)g.flags.faCooldown--; return null; }
+  if(g._rng()>0.34) return null;
+  g.flags.faCooldown=2;
+  const pool=teamPool(g.league).filter(t=>t!==g.team);
+  const target=pick(g._rng,pool);
+  const f=FIT[g.fit]||FIT.ok;
+  return {type:'branch',title:'合約年',
+    text:`合約到期。${target} 開出更高的價碼，${g.team} 希望你留下來。\n\n`+
+         `你在 ${g.team} 的體系適配是「${f.n}」——${f.d}換一支球隊就要重新擲一次，`+
+         `可能更好，也可能從此格格不入。`,
+    opts:[
+      {label:`轉隊到 ${target}`,
+       desc:g.fit==='bad'?'薪水更高，而且你在這裡本來就不合，換個地方說不定活過來。'
+                         :'薪水更高，但體系適配會重新洗牌，現在這份默契帶不走。',
+       kind:'norm',act:'trade:'+target},
+      {label:`續留 ${g.team}`,
+       desc:g.fit==='good'?'薪水少一點，但你在這套體系裡練什麼都吃得進去，這很難得。'
+                          :'薪水少一點，換一個熟悉的位置與球迷，適配度維持不變。',
+       kind:'safe',act:'resign'},
+    ]};
+}
+/* 中華隊：層級越高門檻越高，打法三選一，成功會實質提高被海外球隊看到的機率 */
+function natlBranch(g,ovr){
+  if(ovr<68||g.flags.natlCooldown>0){ if(g.flags.natlCooldown>0)g.flags.natlCooldown--; return null; }
+  if(g._rng()>0.5) return null;
+  g.flags.natlCooldown=1;
+  /* 只抽你資格夠得上的賽事，層級越高權重越低 */
+  const pool=NATL_COMPS.filter(c=>ovr>=c.need);
+  const use=pool.length?pool:[NATL_COMPS[0]];
+  const total=use.reduce((s,c)=>s+c.w,0);
+  let r=g._rng()*total,comp=use[use.length-1];
+  for(const c of use){ r-=c.w; if(r<=0){ comp=c; break; } }
+  const opts=NATL_PLANS.map(pl=>({
+    label:pl.n,desc:pl.d,kind:pl.kind,act:'natl:'+comp.n+'|'+pl.k,p:pl.p(g),
+  }));
+  opts.push({label:'以傷勢為由婉拒',desc:'保住身體，專心準備下一季。名氣會掉一點，但膝蓋只有一雙。',
+    kind:'safe',act:'skipNatl'});
+  return {type:'branch',title:'中華隊徵召 · '+comp.n,
+    text:`協會來電，${comp.n}的名單上有${g.name}。${comp.d}\n\n`+
+         `集訓期正好卡在休賽季，去了就沒有休息（負荷 +10）。但打得好，名氣與海外曝光都會跟著上來——`+
+         `這一層級的舞台，值 ${comp.buzz>=1.9?'非常多':comp.buzz>=1?'不少':'一些'}球探的注意力。`,
+    opts:opts};
+}
+function teamPool(lg){
+  return {hbl:HS_TEAMS,uba:UBA_TEAMS,ncaa:['杜克','肯塔基','岡薩加','UCLA','亞利桑那'],
+    plg:PLG_TEAMS,t1:T1_TEAMS,bleague:JP_TEAMS,kbl:KR_TEAMS,nbl:AU_TEAMS,
+    euro:EU_TEAMS,gleague:GL_TEAMS,nba:NBA_TEAMS}[lg]||PLG_TEAMS;
+}
+
+/* ---------- 球探報告 ----------
+   只攤開「你正在追的下一道門檻」，不把整張表倒給玩家：
+   有目標才有參與感，但全部攤開就沒有探索的價值了。 */
+function scoutReport(g){
+  const ovr=overall(g),rows=[];
+  const req=(lab,need,cur)=>({lab:lab,need:need,cur:r1(cur),gap:r1(Math.max(0,need-cur)),ok:cur>=need});
+  if(g.stage==='hs'){
+    rows.push({n:'NCAA 一級 · 高中畢業直接出國',reqs:[req('綜合',64,ovr),req('球商',55,g.a.iq)],
+      note:'兩項同時達標就一定拿得到邀請，不用擲骰。這是唯一一條「一畢業就出國」的路。'});
+    rows.push({n:'職籃選秀 · 高中直投',reqs:[req('綜合',64,ovr)],p:draftOdds(g,'goDraft'),
+      note:'高中直投的中選率會再被扣一截，讀完大學再投比較穩。'});
+  }else if(g.stage==='uba'||g.stage==='ncaa'){
+    if(g.stage==='ncaa') rows.push({n:'NBA 選秀 · 大一起每年都能宣告',
+      reqs:[req('球探評價',NBA_SCOUT_GATE,nbaScout(g,ovr))],p:draftOdds(g,'nbaDraft'),
+      note:`球探評價＝現值綜合 ${ovr} 與天花板 ${potOvr(g)} 的加權，年級越低越看天花板。`+
+           '越早宣告中選率越低，但落選就失去學生資格、只能從 G League 打起。'});
+    rows.push({n:'日本 B.LEAGUE 測試 · 畢業直接闖',reqs:[req('綜合',74,ovr)],p:draftOdds(g,'tryJapan'),
+      note:'沒過就回台灣補選，等於浪費一次選秀順位。'});
+    rows.push({n:'國內職籃選秀',reqs:[req('綜合',46,ovr)],p:draftOdds(g,'goDraft'),
+      note:'綜合越高順位越前面，而順位會直接影響你第一年在隊上的定位。'});
+  }else if(g.stage==='pro'){
+    const cur=LEAGUES[g.league].tier;
+    for(const o of OVERSEAS){
+      if(LEAGUES[o.lg].tier<=cur) continue;
+      const reach=o.from.indexOf(g.league)>=0;
+      const aged=g.age>o.age;
+      const radar=o.lg!=='nba'||!!g.flags.nbaRadar;
+      rows.push({n:o.label,reqs:[req('綜合',o.ovr,ovr)],
+        tier:LEAGUES[o.lg].tier,blocked:!reach||aged||!radar,
+        note:aged?`年齡上限 ${o.age} 歲，你已經 ${g.age} 歲，這條路關了。`
+          :!reach?`要先待過 ${o.from.map(k=>LEAGUES[k].short).join('／')} 才談得上。`
+          :!radar?'還沒進 NBA 球探的名單。打過 NCAA／G League／歐洲／澳洲，或在國際賽打出代表作，才會被列入。'
+          :'達標之後每季擲一次。超過門檻越多、名氣與國際賽曝光越高，被相中的機率越大。'});
+    }
+    rows.sort((a,b)=>(a.blocked?1:0)-(b.blocked?1:0)||a.tier-b.tier);
+    if(!rows.length) rows.push({n:'已經站在天花板',reqs:[],
+      note:'這個聯盟之上沒有更高的層級了。接下來要追的是冠軍、獎項與生涯紀錄。'});
+  }
+  return {ovr:ovr,peer:peerRank(g,ovr),role:g.role,fit:g.fit,rows:rows.slice(0,3)};
+}
+
+/* ---------- 執行分岔選擇 ---------- */
+function applyBranch(g,idx){
+  const opt=g.pending.opts[idx];
+  const act=opt.act;
+  const rng=g._rng;
+  let card={kind:'branch',title:g.pending.title,eyebrow:stageLabel(g),body:''};
+
+  const move=(lg,teamName)=>{
+    g.league=lg; g.team=teamName||pick(rng,teamPool(lg));
+    if(g.teamsPlayed.indexOf(g.team)<0) g.teamsPlayed.push(g.team);
+    g.sameTeamYears=0; g.sameTeamStar=0;
+    rollFit(g);                       /* 換了地方就重擲體系適配 */
+  };
+  /* 適配度講給玩家聽，順便解釋接下來幾季為什麼練得動／練不動 */
+  const fitLine=()=>`\n\n體系適配：${FIT[g.fit].n}。${FIT[g.fit].d}`;
+
+  if(act==='goUBA'){
+    g.stage='uba'; g.stageYear=0; move('uba');
+    card.body=`${g.name}進了 ${g.team}，UBA 甲一級。大學四年，是最後一次能安心變強的時間。`+fitLine();
+  }else if(act==='goNCAA'){
+    g.stage='ncaa'; g.stageYear=0; move('ncaa');
+    card.body=`拿到 ${g.team} 的獎學金。第一次坐上飛越太平洋的班機，球衣背後印的是拼音。`+fitLine();
+    g.fame=clamp(g.fame+12,0,100); g.flags.nbaRadar=true;
+  }else if(act==='gap'){
+    g.stage='hs'; g.stageYear=2; g.flags.gapYear=true;
+    card.body='替代役期間跟著業餘聯賽打，晚上自己去球館加練。這一年沒有人看著你。';
+  }else if(act==='goDraft'||act==='goDraftT1'||act==='earlyDraft'||act==='nbaDraft'){
+    const ovr=overall(g);
+    const odds=draftOdds(g,act);          /* 與畫面上顯示的粗略帶同一個來源 */
+    if(act==='nbaDraft'){
+      const early=g.stage==='ncaa'&&g.stageYear<4;
+      const yn=['','大一','大二','大三','大四'][clamp(Math.round(g.stageYear),1,4)];
+      const scout=nbaScout(g,ovr);
+      const inNBA=rng()<odds;
+      if(inNBA){
+        /* 順位看球探評價：十九歲的樂透籤是賭天花板賭出來的 */
+        const pick=clamp(Math.round(46-(scout-78)*3.4+ri(rng,-4,5)),1,60);
+        g.flags.pickNo=pick;
+        g.stage='pro'; g.stageYear=0; move('nba');
+        card.body=`NBA 選秀夜，${pick<=14?'樂透區':pick<=30?'第一輪':'第二輪'}第 ${pick} 順位，${g.team} 念出了你的名字。`+
+          (early?`\n\n${yn}就走。你把還沒打過的三年一次賣掉了，買家願意付錢。`:'')+
+          '\n\n全台灣的手機同時亮起來。'+fitLine();
+        g.fame=clamp(g.fame+(pick<=14?42:pick<=30?35:26),0,100); card.hl=true;
+      }else{
+        g.stage='pro'; g.stageYear=0; move('gleague');
+        card.body='選秀落選。簽下 G League 的雙向合約，從最底層開始。'+
+          (early?`\n\n${yn}宣告的人回不去學校了。那三年不會再有第二次。`:'')+fitLine();
+        g.fame=clamp(g.fame+8,0,100);
+      }
+    }else{
+      const lg=act==='goDraftT1'?'t1':'plg';
+      /* 落選：實力不到就是進不去，高中直接投還要再扣一截 */
+      const drafted=rng()<odds;
+      if(!drafted){
+        card.body=`${LEAGUES[lg].n}選秀夜，兩輪念完，沒有你的名字。\n\n`+
+          `隔天你回球場練了兩個小時，然後把球放回袋子裡。${g.name}的籃球，停在這裡。`;
+        card.hl=false; g.log.push(card);
+        g.retiredWhy='undrafted';
+        return doRetire(g);
+      }
+      g.stage='pro'; g.stageYear=0; move(lg);
+      const pickNo=clamp(Math.round(13-(ovr-52)/4.2+ri(rng,-2,3)),1,20);
+      g.flags.pickNo=pickNo;
+      card.body=`${LEAGUES[lg].n}選秀，第 ${pickNo<=8?'一':'二'}輪第 ${pickNo} 順位，${g.team}。`+
+        (pickNo<=3?'狀元級的期待壓在肩上。':pickNo<=8?'首輪，位置穩了，接下來看自己。':'順位不高，得靠訓練賽把位置搶回來。')
+        +fitLine();
+      g.fame=clamp(g.fame+(pickNo<=3?18:pickNo<=8?10:4),0,100);
+    }
+  }else if(act==='tryJapan'){
+    const ok=rng()<draftOdds(g,'tryJapan');
+    if(ok){
+      g.stage='pro'; g.stageYear=0; move('bleague');
+      card.body=`測試賽通過。${g.team} 簽下你，亞洲外籍名額。日文一句都不會，但籃球是共通語言。`+fitLine();
+      g.fame=clamp(g.fame+16,0,100); card.hl=true;
+    }else{
+      g.stage='pro'; g.stageYear=0; move('plg');
+      card.body='測試賽最後一天被刷掉。回台灣參加補選，落腳 '+g.team+'。'+fitLine();
+      g.a.mind=clamp(g.a.mind-3,0,99);
+    }
+  }else if(act&&act.indexOf('move:')===0){
+    const lg=act.slice(5);
+    move(lg);
+    card.body=`簽約 ${LEAGUES[lg].n} ${g.team}。行李箱裡塞了兩罐辣椒醬和一包泡麵。`+fitLine();
+    card.hl=true; g.fame=clamp(g.fame+10,0,100);
+    if(lg==='gleague'||lg==='euro'||lg==='nbl') g.flags.nbaRadar=true;
+  }else if(act==='stayHome'){
+    card.body='你婉拒了。留在這裡，你是招牌；出去，你是無名氏。這個選擇沒有標準答案。';
+    g.fame=clamp(g.fame+2,0,100);
+  }else if(act&&act.indexOf('trade:')===0){
+    const t=act.slice(6);
+    g.team=t; if(g.teamsPlayed.indexOf(t)<0) g.teamsPlayed.push(t);
+    g.sameTeamYears=0; g.sameTeamStar=0;
+    rollFit(g);
+    card.body=`轉隊到 ${t}。新的體系、新的更衣室，薪水多了一截。`+fitLine();
+    g.a.mind=clamp(g.a.mind-1,0,99);
+  }else if(act==='resign'){
+    card.body=`跟 ${g.team} 續約。球迷在記者會外面等到散場。`+
+      `（體系適配維持「${FIT[g.fit].n}」）`;
+    bumpAttr(g,'mind',2); g.fame=clamp(g.fame+3,0,100);
+  }else if(act&&act.indexOf('natl:')===0){
+    const arg=act.slice(5).split('|');
+    const comp=NATL_COMPS.find(c=>c.n===arg[0])||NATL_COMPS[0];
+    const plan=NATL_PLANS.find(p=>p.k===arg[1])||NATL_PLANS[1];
+    const ok=rng()<plan.p(g);
+    /* 賽事層級越高，同樣一場好球值的曝光越大 */
+    const buzz=ok?comp.buzz:comp.buzz*0.25;
+    g.natlBuzz+=buzz;
+    g.natl.push({y:g.year,c:comp.n,plan:plan.k,planName:plan.n,big:ok,buzz:r1(buzz)});
+    g.load=clamp(g.load+10,0,100);
+    const REACT={
+      carry:{ok:`${comp.n}，最後一節你連拿 11 分。轉播鏡頭沒有離開過你，隔天所有體育版都是同一張照片。`,
+             bad:`${comp.n}，你要了太多球。最後兩分鐘連丟三球，鏡頭掃過板凳時教練沒有看你。`},
+      orchestrate:{ok:`${comp.n}，中華隊終於像一支球隊。全場 14 次助攻，數據不炫，但每個看懂的人都看懂了。`,
+             bad:`${comp.n}，節奏一直串不起來。你傳出去的球，隊友接得比防守者還吃力。`},
+      lockdown:{ok:`${comp.n}，你把對方王牌守到 4 投 1 中。得分欄很難看，但球探的筆記上你被圈起來。`,
+             bad:`${comp.n}，對方王牌在你頭上砍了 30 分。轉播單位反覆播了那三顆。`},
+    }[plan.k];
+    if(ok){
+      card.body=REACT.ok+`\n\n名氣 +${comp.fame}，海外曝光 +${r1(buzz)}。`;
+      g.fame=clamp(g.fame+comp.fame,0,100);
+      if(plan.k==='carry') bumpAttr(g,'mind',3);
+      else if(plan.k==='orchestrate'){ bumpAttr(g,'iq',2); bumpAttr(g,'pass',1.5); }
+      else { bumpAttr(g,'def',2); bumpAttr(g,'ath',1); }
+      if(comp.buzz>=1) addTrait(g,'hero');
+      g.flags.nbaRadar=true; card.hl=true;
+    }else{
+      card.body=REACT.bad+`\n\n中華隊小組止步。名氣 +${Math.round(comp.fame*0.3)}，`+
+        `但這一趟還是留下了一點經驗。`;
+      g.fame=clamp(g.fame+Math.round(comp.fame*0.3),0,100);
+      bumpAttr(g,'iq',1.5);
+      if(plan.k==='carry') bumpAttr(g,'mind',-2);
+    }
+  }else if(act==='skipNatl'){
+    card.body='你婉拒了徵召。網路上罵聲不少，但你的膝蓋只有一雙。';
+    g.load=clamp(g.load-6,0,100); g.fame=clamp(g.fame-5,0,100);
+  }else if(act==='stay'){
+    card.body='你選擇繼續。';
+  }else if(act==='retire'){
+    if(!g.retiredWhy) g.retiredWhy='choice';
+    g.log.push(card); return doRetire(g);
+  }
+  if(card.body) g.log.push(card);
+  card.newTraits=g._newTraits.slice(); g._newTraits=[];
+  stepYear(g);
+  return card;
+}
+
+/* ---------- 退休與履歷 ---------- */
+function doRetire(g){
+  g.stage='retired'; g.phase='end';
+  const c=g.career;
+  const avg=k=>c.gp>0?r1(c[k]/c.gp):0;
+  /* 名人堂分數 */
+  let hof=0;
+  hof+=g.champs*4.5;
+  hof+=g.awards.filter(a=>a.t.indexOf('年度 MVP')>=0).length*10;
+  hof+=g.awards.filter(a=>a.t==='總冠軍賽 MVP').length*4.5;
+  hof+=g.awards.filter(a=>a.t==='年度第一隊').length*2.2;
+  hof+=g.awards.filter(a=>a.t.indexOf('王')>=0).length*1.5;
+  hof+=clamp(g.bestOvr-74,0,24)*1.15;
+  hof+=clamp((c.gp>0?c.pts/c.gp:0)*0.55,0,10);
+  hof+=g.natl.filter(n=>n.big).length*3.5;
+  /* 打過的最高殿堂：本土封王不等於名人堂，旅外層級才是關鍵加權 */
+  const topTier=g.seasons.reduce((m,s)=>{
+    const k=Object.keys(LEAGUES).find(kk=>LEAGUES[kk].short===s.lg);
+    return k?Math.max(m,LEAGUES[k].tier):m;},1);
+  hof+=topTier>=9?16:topTier>=7?8:topTier>=6?4.5:topTier>=5?2.5:0;
+  hof+=clamp(g.seasons.filter(s=>s.lg==='NBA').length*3,0,18);
+  hof+=clamp(g.fame/14,0,7);
+  hof+=clamp(g.milestones.reduce((s,k)=>{
+    const m=MILESTONES.find(x=>x.k===k); return s+(m?m.v:0);},0)*0.15,0,4);
+  hof+=clamp(g.starYears*0.2,0,3);
+  if(trait(g,'glass')) hof-=6;
+  if(trait(g,'cancer')) hof-=8;
+  if(trait(g,'benchwarm')) hof-=4;
+  hof=clamp(Math.round(hof),0,100);
+  g.hof=hof;
+  g.hofIn=hof>=70;
+  if(g.hofIn) addTrait(g,'legend');
+  if(g.stage==='retired'&&g.seasons.some(s=>s.stage.indexOf('大')===0)&&g.a.iq>=80) addTrait(g,'scholar');
+
+  const bestSeason=g.seasons.filter(x=>!x.miss&&x.gp>0)
+    .reduce((m,x)=>(!m||x.pts>m.pts)?x:m,null);
+  g.summary={
+    seasons:c.seasons,gp:c.gp,
+    pts:avg('pts'),reb:avg('reb'),ast:avg('ast'),stl:avg('stl'),blk:avg('blk'),
+    totalPts:Math.round(c.pts),totalReb:Math.round(c.reb),totalAst:Math.round(c.ast),
+    fg:avg('fg'),tp:avg('tp'),ft:avg('ft'),
+    money:Math.round(g.money),champs:g.champs,bestOvr:g.bestOvr,
+    mvps:g.awards.filter(a=>a.t.indexOf('MVP')>=0).length,
+    hiGame:c.hiGame,bestStreak:g.bestStreak,bestPts:bestSeason?bestSeason.pts:0,
+    starYears:g.starYears,benchYears:g.benchYears,natlBuzz:r1(g.natlBuzz),
+    miles:g.milestones.map(k=>{const m=MILESTONES.find(x=>x.k===k);return m?m.n:k;}),
+    hof:hof,hofIn:g.hofIn,grade:grade(hof,g),
+  };
+  g.afterlife=afterlife(g);
+  g.pending={type:'end'};
+  return {kind:'end'};
+}
+/* 退役之後：一段收尾，讓生涯不是停在一張數據表上 */
+function afterlife(g){
+  const s=g.summary,c=g.career;
+  const rich=g.money>=12000, mid=g.money>=3500;
+  const smart=g.a.iq>=78, warm=g.a.mind>=72;
+  const abroad=g.seasons.some(x=>['B1','KBL','NBL','EURO','GLG','NBA','NCAA'].indexOf(x.lg)>=0);
+  const cands=[];
+  if(g.retiredWhy==='undrafted'){
+    cands.push('後來你在公司行號的社會組打球，禮拜三晚上，球場燈只開一半。有人問你當年打哪，你說高中而已。',
+      '你去當了體育老師。每一屆都會有一個孩子，讓你想起十八歲的自己。',
+      '球具店的兼職做了兩年，後來轉去做業務。籃球變成週末的事，這樣也沒什麼不好。');
+  }else if(g.hofIn){
+    cands.push('名人堂那天，你把致詞稿揉成一團，直接講了三十分鐘。台下有你高中的教練。',
+      '球衣升上主場天花板。多年後有小球員在訪問裡說：我是看他的比賽長大的。',
+      '你的名字被印在球場外牆上。每次回去，你都會在那面牆前面站一下才進門。');
+  }else if(g.champs>=2&&warm){
+    cands.push(`退休隔年你回到 ${g.teamsPlayed[g.teamsPlayed.length-1]} 當助理教練，`+
+      '從最不起眼的防守輪轉開始教起。',
+      '你成了球隊的青訓總監。辦公室裡掛著兩枚冠軍戒指，和一張全隊在更衣室的合照。');
+  }else if(smart&&abroad){
+    cands.push('你轉行做球評。因為真的在那些聯盟打過，你講的東西跟別人不一樣，很快就成了固定班底。',
+      '你開始寫專欄，寫旅外球員在異鄉的生活。第一篇就被瘋傳，因為裡面沒有任何一句是漂亮話。');
+  }else if(rich){
+    cands.push('你把生涯的薪水拿去投資餐飲，開了三家店。牆上掛著球衣，但你已經很少提。',
+      '退休後你成了經紀人，專門帶年輕球員談旅外合約。你知道那些合約裡哪一條會吃人。');
+  }else if(smart||warm){
+    cands.push('你回母校當教練。第一年就帶隊打進八強，記者問你感想，你說：比自己打球還緊張。',
+      '你去了基層，帶國小校隊。薪水不高，但每天都有人叫你教練。');
+  }else if(mid){
+    cands.push('你開了一家球具店，順便帶社區的籃球班。生活變得很規律，膝蓋還是會在變天時痛。',
+      '你去了體育用品公司上班。開會時偶爾有人認出你，然後說一句「以前很常看你打」。');
+  }
+  if(g.a.mind<45) cands.push('離開球場之後有一段時間你不太出門。過了兩年才有辦法再走進球館看比賽。');
+  if(g.injuries>=3) cands.push('你的膝蓋在退休後又開了一次刀。醫生說這是十幾年欠下來的，慢慢還。');
+  if(!cands.length) cands.push('你回到日常生活裡。偶爾在社區球場出現，穿著沒有號碼的球衣，投幾球就走。');
+  return pick(g._rng,cands);
+}
+function grade(hof,g){
+  if(hof>=92) return {g:'S',t:'不世出的傳奇'};
+  if(hof>=70) return {g:'A',t:'名人堂級'};
+  if(hof>=54) return {g:'B',t:'聯盟門面'};
+  if(hof>=38) return {g:'C',t:'穩固的先發'};
+  if(hof>=22) return {g:'D',t:'輪替戰力'};
+  /* E 與 F 的分界是「有沒有踏進職業」，不是「有沒有打過任何一季」——
+     用後者的話高中三季就讓 F 永遠發不出來，是死內容。 */
+  if(g.seasons.some(s=>s.stage.indexOf('職業')===0)) return {g:'E',t:'走過一遭的職業球員'};
+  return {g:'F',t:'沒能走到職業的那一步'};
+}
+
+/* =====================================================================
+   事件庫
+   st: 適用階段  w: 權重  o: 選項（k=push/norm/safe，p=成功率）
+   ===================================================================== */
+const EVENTS=[
+/* ---- 高中 ---- */
+{id:'hs_open',st:['hs'],w:3,t:'學長的位置',
+ x:g=>`練球結束，學長把球丟給你：「明天對${pick(g._rng,HS_TEAMS)}，先發五號位缺人。你敢不敢上？」`,
+ o:[
+  {l:'我上',d:'搶下這個位置',k:'push',p:g=>clamp(0.32+(overall(g)-30)/90,0.2,0.8),
+   ok:{x:'你上了，而且沒有丟臉。從此先發名單上有你的名字。',a:{mind:3,iq:2},fame:6,gutsy:1},
+   bad:{x:'你上了，六分鐘掉三次球，被換下來。回板凳的路很長。',a:{mind:-2},load:3}},
+  {l:'我還沒準備好',d:'再多練一年',k:'safe',
+   ok:{x:'學長點點頭沒說話。你在板凳上看完整場，記下了每一次換防。',a:{iq:2.5}}},
+ ]},
+{id:'hs_bp',st:['hs'],w:3,t:'黑豹旗',
+ x:g=>`黑豹旗全國賽第一輪，落後 2 分，最後 8 秒球在你手上。`,
+ o:[
+  {l:'自己拔起來出手',d:'成王敗寇',k:'push',p:g=>clamp((g.a.shoot+g.a.three+g.a.mind)/340,0.2,0.78),
+   ok:{x:'空心。全場炸開，你被隊友壓在地板上。',a:{mind:4,shoot:2,three:1.5},fame:10,gutsy:1},
+   bad:{x:'籃框前緣彈出。哨聲響，賽季結束在這一球。',a:{mind:-3},fame:-2}},
+  {l:'分給空檔的隊友',d:'相信體系',k:'norm',p:g=>clamp(0.4+g.a.pass/180+g.a.iq/220,0.25,0.8),
+   ok:{x:'隊友接球出手命中。你第一個衝過去抱住他。',a:{pass:2.5,iq:2},fame:4},
+   bad:{x:'傳球被抄。你站在原地，看著對手把球運出場外。',a:{pass:-1,mind:-1}}},
+  {l:'叫暫停重整',d:'把責任交給教練',k:'safe',
+   ok:{x:'戰術跑到一半就亂了。輸球，但沒有人怪任何人。',a:{iq:1.5}}},
+ ]},
+{id:'hs_study',st:['hs'],w:2,fav:'floor',t:'期末考',
+ x:'導師把成績單放在桌上：「再這樣下去，甲組資格會有問題。」',
+ o:[
+  {l:'蹺練球去補考',d:'保住資格',k:'safe',ok:{x:'補考過了。教練罵了幾句，但沒有真的生氣。',a:{iq:3},load:-4}},
+  {l:'練球第一，成績再說',d:'賭一把',k:'push',p:g=>clamp(0.45+g.a.iq/200,0.3,0.85),
+   ok:{x:'低空飛過。這一季你多練了 40 個小時。',a:{shoot:2,three:1.5,ath:1},load:5},
+   bad:{x:'被禁賽兩場。教練在全隊面前把你點名。',a:{mind:-2,iq:-1},fame:-3}},
+ ]},
+{id:'hs_growth',st:['hs'],w:2,fav:'anchor',t:'抽高',
+ x:g=>`這學期你長高了 ${ri(g._rng,3,7)} 公分，褲子全部要換。協調性一時跟不上。`,
+ o:[
+  {l:'重新練基本功',d:'從腳步開始',k:'norm',ok:{x:'花了半年才把手感找回來，但身體多了一截。',a:{ath:4,reb:3,handle:-1},pot:{ath:3,reb:3}}},
+  {l:'硬打，靠身體吃人',d:'先享受優勢',k:'push',ok:{x:'身高在高中夠用了。但壞習慣也一起長大。',a:{reb:4,ath:2,handle:-2.5,iq:-1}}},
+ ]},
+{id:'hs_street',st:['hs'],w:2,fav:'slasher',t:'河濱球場',
+ x:'週末的河濱，一群社會人士在鬥牛，有人喊你上場。',
+ o:[
+  {l:'打到天黑',d:'野球場練膽',k:'push',p:g=>clamp(0.5+g.a.handle/200,0.3,0.85),
+   ok:{x:'你學會了在沒有哨子的地方生存。運球變髒了，但也變強了。',a:{handle:3,mind:2.5,ath:1},load:6,gutsy:1},
+   bad:{x:'被撞倒在水泥地上，手肘磨掉一層皮。',a:{handle:1},load:8,hurt:.25}},
+  {l:'說改天',d:'回家休息',k:'safe',ok:{x:'你回家看比賽錄影，把對手的擋拆記了滿滿一本。',a:{iq:2.5},load:-4}},
+ ]},
+{id:'hs_scout',st:['hs'],w:2,cond:g=>g.stageYear>=2,t:'球探來了',
+ x:g=>`場邊多了幾個拿平板的人。有人低聲說：「那個${g.pos}，${g.height} 公分，可以看。」`,
+ o:[
+  {l:'表演給他們看',d:'數據拉滿',k:'push',p:g=>clamp(0.4+(overall(g)-40)/80,0.2,0.8),
+   ok:{x:'單場 32 分。名字被寫進好幾份報告。',a:{shoot:2,mind:1.5},fame:14},
+   bad:{x:'出手 24 次命中 7 球。報告上寫著「選擇不佳」。',a:{iq:-1},fame:-4,ego:1}},
+  {l:'照常打自己的',d:'讓比賽來找你',k:'norm',ok:{x:'12 分 9 助攻 4 抄截。報告上寫「球商成熟」。',a:{iq:2,pass:1.5},fame:7}},
+ ]},
+/* ---- 大學 / NCAA ---- */
+{id:'u_weight',st:['uba','ncaa'],w:3,fav:'slasher',t:'重訓室',
+ x:'體能教練把課表推到你面前：「大學四年，這是你唯一能把身體改造完的機會。」',
+ o:[
+  {l:'加倍菜單',d:'把身體練到極限',k:'push',p:g=>clamp(0.62-g.load/260,0.3,0.85),
+   ok:{x:'臥推多了 25 公斤，垂直彈跳多了 8 公分。',a:{ath:5,reb:2,def:1.5},pot:{ath:4},load:13},
+   bad:{x:'下背拉傷，停練六週。',a:{ath:1},load:16,hurt:.5}},
+  {l:'照課表',d:'穩定累積',k:'norm',ok:{x:'一季下來，數字誠實地往上走。',a:{ath:3,def:1},load:6}},
+  {l:'重心放在技術',d:'把手感練細',k:'safe',ok:{x:'投籃手感明顯乾淨了。',a:{shoot:3,three:2.5},load:-3}},
+ ]},
+{id:'u_bench',st:['uba','ncaa'],w:3,fav:'glue',cond:g=>g.stageYear<=2,t:'板凳',
+ x:g=>`${g.team} 的先發輪不到你。教練說：「再等等。」`,
+ o:[
+  {l:'找教練談，要上場時間',d:'把話講開',k:'push',p:g=>clamp(0.35+g.a.mind/170,0.2,0.75),
+   ok:{x:'教練給了你十分鐘。你用那十分鐘讓他不敢再換你下來。',a:{mind:3,shoot:1.5},fame:6},
+   bad:{x:'教練覺得你不懂尊重。這一季你的號碼幾乎沒被叫過。',a:{mind:-3},ego:1}},
+  {l:'考慮轉學',d:'換個舞台',k:'push',p:g=>0.55,
+   ok:{x:'轉到願意給球權的學校。重新開始，但至少在場上。',a:{shoot:2,handle:1.5,mind:1}},
+   bad:{x:'轉學規定卡住，白白坐了一年冷板凳。',a:{mind:-4,ath:-2}}},
+  {l:'留下來，把訓練賽打爆',d:'用表現說話',k:'safe',
+   ok:{x:'訓練賽場均 20+，教練終於把你放進輪替。',a:{iq:2,def:2,mind:1.5}}},
+ ]},
+{id:'u_final',st:['uba','ncaa'],w:2,fav:'floor',t:'四強賽',
+ x:'四強戰，延長賽，你已經抽筋，教練問你還能不能上。',
+ o:[
+  {l:'能',d:'撐完最後五分鐘',k:'push',p:g=>clamp(0.45+g.a.ath/220+g.a.mind/240,0.25,0.82),
+   ok:{x:'你撐完了，而且投進致勝球。轉播鏡頭給了你三十秒特寫。',a:{mind:4,shoot:2},fame:16,load:9},
+   bad:{x:'你撐完了，但腿沒有了。最後兩罰全丟。',a:{mind:-3},load:14,hurt:.3}},
+  {l:'換人',d:'保護自己',k:'safe',ok:{x:'球隊輸了三分。你坐在板凳上，沒有人看你。',a:{mind:-1},load:-5}},
+ ]},
+{id:'u_agent',st:['uba','ncaa'],w:2,cond:g=>g.stageYear>=2,t:'經紀人',
+ x:'一個穿西裝的人在停車場等你，遞來名片和一份「培養計畫」。',
+ o:[
+  {l:'簽下去',d:'提早佈局',k:'norm',ok:{x:'訓練資源與曝光都上來了，代價是行程被排滿。',a:{shoot:2,three:2},fame:10,load:5}},
+  {l:'先不急',d:'保持單純',k:'safe',ok:{x:'你把名片收進抽屜，繼續練球。',a:{mind:2},load:-3}},
+ ]},
+/* ---- 職業 通用 ---- */
+{id:'p_rookie',st:['pro'],w:3,cond:g=>g.stageYear<=2,t:'新人牆',
+ x:g=>`職業的節奏跟你想的不一樣。${LEAGUES[g.league].n}的對位球員每一個都比你快半步。`,
+ o:[
+  {l:'加練投籃到半夜',d:'用量堆出手感',k:'push',p:g=>clamp(0.58-g.load/240,0.3,0.85),
+   ok:{x:'三個月後，你的定點三分變成教練敢喊的戰術。',a:{three:4,shoot:3},load:11},
+   bad:{x:'手肘發炎，出手變形。',a:{shoot:-1.5},load:14,hurt:.35}},
+  {l:'看影片，學怎麼讀防守',d:'先追上腦袋',k:'norm',ok:{x:'你開始知道球會往哪裡去。失誤少了一半。',a:{iq:4,pass:2.5},load:2}},
+  {l:'接受角色，先做好防守',d:'從能做的做起',k:'safe',ok:{x:'教練在記者會上說你「值得信任」。上場時間穩了。',a:{def:3.5,mind:2},load:-2}},
+ ]},
+{id:'p_minutes',st:['pro'],w:3,fav:'glue',t:'輪替之爭',
+ x:g=>`球隊補進一個跟你同位置的新人。教練說要「良性競爭」。`,
+ o:[
+  {l:'訓練賽把他打服',d:'正面對決',k:'push',p:g=>clamp(0.45+(overall(g)-60)/70,0.2,0.85),
+   ok:{x:'兩週後，他的置物櫃搬到角落。位置是你的。',a:{mind:3,def:2},fame:5},
+   bad:{x:'你太急，數據反而難看。教練把先發給了他。',a:{mind:-3},ego:1}},
+  {l:'教他，順便當老大哥',d:'長線經營',k:'safe',ok:{x:'更衣室氣氛變好，你變成教練最信任的人。',a:{mind:3,iq:2},fame:3}},
+  {l:'要求交易',d:'不想陪玩',k:'push',p:g=>0.5,
+   ok:{x:'球隊放你走，新東家給你球權。',a:{shoot:1.5},ego:1,flag:'wantTrade'},
+   bad:{x:'交易沒談成，你在更衣室的位置變得尷尬。',a:{mind:-4},ego:1}},
+ ]},
+{id:'p_load',st:['pro'],w:3,cond:g=>g.load>=55,t:'膝蓋在說話',
+ x:g=>`負荷 ${Math.round(g.load)}。隊醫把 MRI 轉過來給你看：「軟骨磨損，這一季再這樣打下去，我不敢保證。」`,
+ o:[
+  {l:'打完再說',d:'球隊還在爭季後賽',k:'push',p:g=>clamp(0.55-(g.load-55)/90,0.1,0.7),
+   ok:{x:'你撐完了整季，球隊擠進季後賽。膝蓋的帳單延後付款。',a:{mind:3},load:14,fame:6},
+   bad:{x:'第 31 場，你倒在地上，起不來。',a:{mind:-2},load:10,hurt:.85}},
+  {l:'進入輪休管理',d:'保養優先',k:'safe',ok:{x:'缺了 12 場例行賽，但季後賽你是最有力氣的那個。',a:{ath:1},load:-22,fame:-4}},
+  {l:'開刀清創，休一季',d:'一次解決',k:'norm',ok:{x:'手術很順利。復健很長。回來的時候，聯盟已經換了一批人。',a:{ath:-3,mind:2},load:-45,flag:'surgery'}},
+ ]},
+{id:'p_money',st:['pro'],w:2,cond:g=>g.fame>=40,t:'代言',
+ x:'運動品牌開了一份合約，條件是季中要配合十場活動。',
+ o:[
+  {l:'簽',d:'錢與曝光',k:'norm',ok:{x:'看板上是你的臉。行程也是你的。',money:260,fame:12,load:7,a:{mind:1}}},
+  {l:'只接休賽季的檔期',d:'留住體力',k:'safe',ok:{x:'錢少一半，但球季乾淨。',money:110,fame:5,load:1}},
+  {l:'全部推掉',d:'專心打球',k:'safe',ok:{x:'經紀人很不高興。教練很高興。',fame:-3,a:{def:1.5,iq:1.5},load:-4}},
+ ]},
+{id:'p_locker',st:['pro'],w:2,t:'更衣室',
+ x:'年輕球員在媒體面前抱怨球權，記者把麥克風轉向你。',
+ o:[
+  {l:'公開挺他',d:'站在球員這邊',k:'push',p:g=>0.5,
+   ok:{x:'球隊高層私下罵，但更衣室把你當自己人。',a:{mind:3},fame:6},
+   bad:{x:'被解讀成逼宮。你成了報導裡的「不安定因素」。',a:{mind:-2},fame:-6,ego:1}},
+  {l:'幫教練圓場',d:'當大人',k:'norm',ok:{x:'風波兩天就過去了。教練記住這件事。',a:{iq:2,mind:1.5}}},
+  {l:'「這不關我的事」',d:'保持距離',k:'safe',ok:{x:'標題寫成「冷漠」。你不在意。',a:{mind:1},fame:-2,ego:1}},
+ ]},
+{id:'p_slump',st:['pro'],w:2,fav:'shooter',cond:g=>g.stageYear>=3,t:'低潮',
+ x:'連續七場命中率不到三成。你開始在罰球線上想東想西。',
+ o:[
+  {l:'狂投一萬球',d:'用量壓過去',k:'push',p:g=>clamp(0.5-g.load/300,0.25,0.8),
+   ok:{x:'第八場，第一球進了。整個人鬆開來。',a:{shoot:3,three:2,mind:2},load:10},
+   bad:{x:'越投越僵。手感沒回來，手腕先廢了。',a:{shoot:-2},load:13,hurt:.3}},
+  {l:'找運動心理師',d:'從腦袋處理',k:'norm',ok:{x:'你學會了在出手前把雜音關掉。',a:{mind:5,iq:1.5},load:-3}},
+  {l:'減少出手，改做組織',d:'換一種貢獻',k:'safe',ok:{x:'得分掉了，但球隊贏球了。',a:{pass:3,iq:2.5},load:-2}},
+ ]},
+{id:'p_abroad',st:['pro'],w:2,cond:g=>LEAGUES[g.league].tier>=5,t:'人在異鄉',
+ x:g=>`${LEAGUES[g.league].n}。語言不通，飲食不慣，客場飛行時間比你想的長很多。`,
+ o:[
+  {l:'學語言，融進更衣室',d:'把自己變成本地人',k:'norm',ok:{x:'半年後你能在暫停時用當地話喊戰術。隊友開始找你。',a:{iq:3,pass:2,mind:2},fame:5}},
+  {l:'埋頭練球，其他不管',d:'數據會說話',k:'push',ok:{x:'數據不錯，但你永遠是那個「外籍球員」。',a:{shoot:3,three:2},load:6,fame:2}},
+  {l:'把家人接過來',d:'穩住生活',k:'safe',ok:{x:'有人在家等你，比賽輸了也沒那麼難受。',a:{mind:4},load:-5}},
+ ]},
+{id:'p_vet',st:['pro'],w:2,fav:'anchor',cond:g=>g.age>=30,t:'老將',
+ x:g=>`${g.age} 歲。熱身時間變長，恢復時間變更長。球隊給你的角色開始有「指導」兩個字。`,
+ o:[
+  {l:'不接受，我還能先發',d:'跟時間對幹',k:'push',p:g=>clamp(0.4+(overall(g)-64)/60,0.15,0.75),
+   ok:{x:'你打出了一個不像 30 歲的球季。',a:{mind:3,shoot:1.5},load:12,fame:7},
+   bad:{x:'數據掉得比預期快。教練把你的名字往後移了。',a:{mind:-3,ath:-2},load:9}},
+  {l:'轉型第六人',d:'調整定位',k:'norm',ok:{x:'上場時間少了，效率高了。你變成球隊最穩的那一段。',a:{iq:3,mind:2},load:-6}},
+  {l:'當球員兼助教',d:'開始想退休後',k:'safe',ok:{x:'年輕球員開始叫你「哥」。你發現教球也有意思。',a:{iq:4,mind:2},load:-11,flag:'coachPath'}},
+ ]},
+{id:'p_playoff',st:['pro'],w:3,fav:'shooter',t:'季後賽',
+ x:'系列賽 2 比 2，第五戰第四節，教練把球交到你手上。',
+ o:[
+  {l:'我要球',d:'扛下來',k:'push',p:g=>clamp((g.a.shoot+g.a.mind+g.a.three)/360,0.18,0.8),
+   ok:{x:'第四節你獨得 17 分。系列賽 3 比 2。',a:{mind:4,shoot:2},fame:15},
+   bad:{x:'四次失誤，兩個進攻犯規。系列賽 2 比 3。',a:{mind:-3},fame:-5}},
+  {l:'打體系，該傳就傳',d:'相信隊友',k:'norm',p:g=>clamp(0.45+g.a.iq/180,0.3,0.82),
+   ok:{x:'球隊贏了，你 14 分 9 助攻，沒有一個回合是勉強的。',a:{iq:3,pass:2.5},fame:8},
+   bad:{x:'隊友沒把握住機會。你傳出的兩球都彈框而出。',a:{pass:1}}},
+ ]},
+{id:'p_natl_camp',st:['pro'],w:2,cond:g=>overall(g)>=64,t:'集訓通知',
+ x:'休賽季的集訓名單公布了，你的名字在上面。但你的膝蓋想休息。',
+ o:[
+  {l:'去',d:'國家隊優先',k:'push',ok:{x:'集訓很硬，但對抗強度是聯盟裡沒有的。',a:{def:3,ath:1.5,iq:2},load:12,fame:6}},
+  {l:'請假',d:'身體優先',k:'safe',ok:{x:'你在家做復健。網路上有人罵你不愛國。',load:-12,fame:-6,a:{mind:-1}}},
+ ]},
+{id:'p_charity',st:['pro'],w:1,cond:g=>g.fame>=50,t:'籃球營',
+ x:'家鄉的國中請你回去辦一場籃球營。沒有出席費。',
+ o:[
+  {l:'回去辦',d:'把路留給下一個',k:'safe',ok:{x:'有個瘦瘦的孩子問你「怎麼樣才能打職業」。你想了很久才回答。',a:{mind:3},fame:8}},
+  {l:'行程排不開',d:'專心球季',k:'norm',ok:{x:'你把時間留給訓練。',a:{shoot:1.5},load:2}},
+ ]},
+];
+</script>
+
+<script id="ui">
+/* =====================================================================
+   UI 層
+   ===================================================================== */
+const $=s=>document.querySelector(s);
+const app=$('#app');
+let G=null;
+let ALLOC={},INTENS='normal',ATT='steady';
+let PANEL=null;   /* 記分板上展開的面板：'attrs' | 'load' | null */
+
+/* ---- 皮膚與字級 ---- */
+const root=document.documentElement;
+let skinPinned=false;   /* 使用者手動選過皮膚後，就不再跟著檢視器主題跑 */
+function preferredSkin(){
+  const t=root.getAttribute('data-theme');
+  if(t==='dark') return 'scoreboard';
+  if(t==='light') return 'wood';
+  return (window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches)?'wood':'scoreboard';
+}
+(function initSkin(){
+  root.setAttribute('data-skin',preferredSkin());
+  syncSkinBtns();
+  if(window.matchMedia){
+    const mq=window.matchMedia('(prefers-color-scheme: light)');
+    const onChange=()=>{ if(!skinPinned){ root.setAttribute('data-skin',preferredSkin()); syncSkinBtns(); } };
+    if(mq.addEventListener) mq.addEventListener('change',onChange); else if(mq.addListener) mq.addListener(onChange);
+  }
+  if(window.MutationObserver){
+    new MutationObserver(()=>{ if(!skinPinned){ root.setAttribute('data-skin',preferredSkin()); syncSkinBtns(); } })
+      .observe(root,{attributes:true,attributeFilter:['data-theme']});
+  }
+})();
+function syncSkinBtns(){
+  const cur=root.getAttribute('data-skin');
+  document.querySelectorAll('[data-skin-btn]').forEach(b=>{
+    b.setAttribute('aria-pressed',String(b.dataset.skinBtn===cur));
+  });
+}
+document.querySelectorAll('[data-skin-btn]').forEach(b=>{
+  b.addEventListener('click',()=>{ skinPinned=true; root.setAttribute('data-skin',b.dataset.skinBtn); syncSkinBtns(); });
+});
+$('#fsBtn').addEventListener('click',function(){
+  const on=root.getAttribute('data-fs')==='lg';
+  if(on) root.removeAttribute('data-fs'); else root.setAttribute('data-fs','lg');
+  this.setAttribute('aria-pressed',String(!on));
+});
+
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),1800);
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* 複製：navigator.clipboard 只在安全情境下存在，用 file:// 直接開這個檔時是 undefined
+   （不是回傳失敗的 Promise，是整個物件不存在）。所以要先探再退回舊做法，
+   不然單機版按下去會直接丟 TypeError。 */
+function copyText(txt){
+  const ok=()=>toast('已複製生涯摘要'), no=()=>toast('複製失敗，請手動選取');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(ok,()=>fallbackCopy(txt)?ok():no());
+    return;
+  }
+  fallbackCopy(txt)?ok():no();
+}
+function fallbackCopy(txt){
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=txt;
+    ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;top:0;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0,txt.length);
+    const done=document.execCommand&&document.execCommand('copy');
+    document.body.removeChild(ta);
+    return !!done;
+  }catch(e){ return false; }
+}
+
+/* =========================== 開場 =========================== */
+function urlSeed(){
+  const m=location.search.match(/[?&]seed=([a-z0-9]+)/i);
+  return m?m[1]:null;
+}
+function randomSeed(){ return makeSeed(Math.random); }
+
+function renderStart(){
+  const seed=urlSeed()||randomSeed();
+  const rn=mulberry32(cyrb128('name|'+seed));
+  const defName=pick(rn,SURNAME)+pick(rn,NAMES_A)+pick(rn,NAMES_B);
+  app.innerHTML=`
+  <div class="hero">
+    <div class="mark">Basketball Life Simulator</div>
+    <h1>籃球人生</h1>
+    <p class="sub">從高中球隊的撿球員開始，走到你走得到的最遠的地方。</p>
+    <div class="path">HBL 高中三年 → UBA／NCAA → 職籃選秀 → P.LEAGUE+／T1<br>
+    → 日本 B1 → 韓國 KBL → 澳洲 NBL → 歐洲 → G LEAGUE → NBA<br>
+    <span style="color:var(--accent)">每一層都有門檻，綜合不夠就出不去。</span></div>
+  </div>
+  <div class="dock-in">
+    <div class="field">
+      <label for="nameIn">球員姓名</label>
+      <input id="nameIn" value="${esc(defName)}" maxlength="12" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>先發位置</label>
+      <div class="posgrid" id="posGrid">
+        ${Object.keys(POS).map((k,i)=>`
+          <button class="posbtn" data-pos="${k}" aria-pressed="${i===2}">
+            <b>${k}</b><span>${POS[k].n}</span>
+          </button>`).join('')}
+      </div>
+      <p class="posdesc" id="posDesc">${POS.SF.d}</p>
+    </div>
+    <div class="field">
+      <label>球風（決定你練得動什麼）</label>
+      <div class="stygrid" id="styGrid">
+        ${STYLE_KEYS.map((k,i)=>`
+          <button class="stybtn" data-sty="${k}" aria-pressed="${i===0}">${STYLES[k].n}</button>`).join('')}
+      </div>
+      <p class="posdesc" id="styDesc">${STYLES.allround.d}</p>
+    </div>
+    <div class="field">
+      <label for="seedIn">世界種子（相同種子＋相同選擇＝相同人生）</label>
+      <input id="seedIn" value="${esc(seed)}" maxlength="24" autocomplete="off">
+    </div>
+    <button class="btn" id="startBtn">開始生涯 ▸ 高一春天</button>
+    <div class="btn-row">
+      <button class="btn ghost" id="reseedBtn">換一個種子</button>
+    </div>
+    <p class="hint">身高、天賦上限與<b>天生體質</b>由種子決定，開局就已經寫好了。
+      你能決定的是球風、每一季的訓練點數往哪裡放，以及每一次要不要賭。</p>
+  </div>`;
+
+  let pos='SF',sty='allround';
+  $('#posGrid').addEventListener('click',e=>{
+    const b=e.target.closest('.posbtn'); if(!b) return;
+    pos=b.dataset.pos;
+    document.querySelectorAll('.posbtn').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    $('#posDesc').textContent=POS[pos].d;
+  });
+  $('#styGrid').addEventListener('click',e=>{
+    const b=e.target.closest('.stybtn'); if(!b) return;
+    sty=b.dataset.sty;
+    document.querySelectorAll('.stybtn').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    $('#styDesc').textContent=STYLES[sty].d;
+  });
+  $('#reseedBtn').addEventListener('click',()=>{ $('#seedIn').value=randomSeed(); });
+  $('#startBtn').addEventListener('click',()=>{
+    const nm=($('#nameIn').value||'').trim()||defName;
+    const sd=($('#seedIn').value||'').trim()||seed;
+    G=createGame(sd,nm,pos,sty);
+    ALLOC={};INTENS='normal';ATT='steady';PANEL=null;
+    render();
+    window.scrollTo(0,0);
+  });
+}
+
+/* =========================== 主畫面 =========================== */
+function render(){
+  if(!G){ renderStart(); return; }
+  if(G.phase==='end'){ renderEnd(); return; }
+  app.innerHTML=board()+`<div class="log" id="log">${G.log.slice(-7).map(cardHTML).join('')}</div>`+dock();
+  wireBoard(); wireDock();
+}
+function wireBoard(){
+  const b=document.querySelector('.board'); if(!b) return;
+  b.addEventListener('click',e=>{
+    const t=e.target;
+    if(t.closest('#attrBtn'))      { PANEL=PANEL==='attrs'?null:'attrs'; render(); }
+    else if(t.closest('#loadBtn')) { PANEL=PANEL==='load' ?null:'load';  render(); }
+    else if(t.closest('#scoutBtn')){ PANEL=PANEL==='scout'?null:'scout'; render(); }
+  });
+}
+
+function board(){
+  const ovr=overall(G);
+  const band=loadBand(G.load);
+  const loadColor=band.k==='danger'?'var(--bad)':band.k==='warn'?'var(--warn)':'var(--good)';
+  const R=ROLES[G.role]||ROLES.starter;
+  return `<div class="board">
+    <div class="board-top">
+      <span class="board-name">${esc(G.name)}</span>
+      <span class="board-pos">${G.pos}</span>
+      <span class="board-sty">${esc(STYLES[G.style].n)}</span>
+      <span class="board-team">${esc(G.team)}<br>${LEAGUES[G.league].n}</span>
+    </div>
+    <div class="board-grid">
+      <div class="cell"><div class="k">年齡</div><div class="v">${G.age}</div></div>
+      <div class="cell"><div class="k">綜合</div><div class="v hi">${ovr}</div></div>
+      <div class="cell"><div class="k">隊上定位</div><div class="v rl ${G.role}">${R.n}</div></div>
+      <div class="cell"><div class="k">生涯薪</div><div class="v">${Math.round(G.money).toLocaleString()}<span class="u">萬</span></div></div>
+    </div>
+    <button class="loadbar" id="loadBtn" aria-expanded="${PANEL==='load'}">
+      <div class="lb-top"><span>膝蓋負荷 · ${band.n}</span><b>${Math.round(G.load)} / 100　${PANEL==='load'?'▲':'▼'}</b></div>
+      <div class="track"><div class="fill" style="width:${G.load}%;background:${loadColor}"></div></div>
+    </button>
+    <div class="board-btns">
+      <button class="tbtn" id="attrBtn"  aria-expanded="${PANEL==='attrs'}">九項能力值 ${PANEL==='attrs'?'▲':'▼'}</button>
+      <button class="tbtn" id="scoutBtn" aria-expanded="${PANEL==='scout'}">球探報告 ${PANEL==='scout'?'▲':'▼'}</button>
+    </div>
+    ${PANEL==='attrs'?attrPanel():''}
+    ${PANEL==='load'?loadPanel():''}
+    ${PANEL==='scout'?scoutPanel():''}
+  </div>`;
+}
+function attrPanel(){
+  const ST=STYLES[G.style];
+  const gk=Object.keys(ST.grow);
+  return `<div class="panel">
+    <div class="attrs">${ATTRS.map(at=>attrRow(at,{cap:G.pot[at.k],edit:false})).join('')}</div>
+    <p class="phint">亮色游標是<b>目前值</b>，灰色刻度是<b>天賦上限</b>（種子開局就決定，練不過去）。
+      粗體項目是 ${G.pos} 綜合評價的主要權重來源。</p>
+    ${gk.length?`<p class="phint">球風「<b>${esc(ST.n)}</b>」的訓練效率：
+      ${gk.map(k=>`<span class="chip ${ST.grow[k]>=1?'up':'down'}">${attrName(k)} ×${ST.grow[k]}</span>`).join(' ')}</p>`:''}
+  </div>`;
+}
+function loadPanel(){
+  const L=loadLedger(G),b=loadBand(G.load);
+  return `<div class="panel">
+    <p class="phint" style="margin-top:0"><b>目前 ${Math.round(G.load)} · ${b.n}</b>　${esc(b.d)}</p>
+    <div class="ledger">
+      <div><h5>會累積</h5>${L.up.map(x=>`<div class="lrow"><span>${esc(x.n)}</span><b class="up">${esc(x.v)}</b></div>`).join('')}</div>
+      <div><h5>會消除</h5>${L.down.map(x=>`<div class="lrow"><span>${esc(x.n)}</span><b class="down">${esc(x.v)}</b></div>`).join('')}</div>
+    </div>
+    <div class="dura ${L.dura.band.k}">
+      <span class="dl">天生體質</span><b>${esc(L.dura.band.n)}</b>
+      <span class="dv">受傷率 ×${L.dura.mult}　·　負荷 ${L.dura.load>0?'+':''}${L.dura.load}</span>
+    </div>
+    <p class="phint">${esc(L.dura.note)}</p>
+    <p class="phint">${esc(L.rule)}</p>
+  </div>`;
+}
+function scoutPanel(){
+  const S=scoutReport(G),R=ROLES[S.role]||ROLES.starter,f=FIT[S.fit]||FIT.ok;
+  const pc=(S.peer.pct*100);
+  return `<div class="panel">
+    <div class="peer">
+      <div class="pr-t">同儕定位 · ${esc(S.peer.lg)}</div>
+      <div class="pr-v"><b>${S.peer.tier}</b>　第 ${S.peer.rank.toLocaleString()} 名
+        <i>／ ${S.peer.size.toLocaleString()} 人・前 ${pc<1?pc.toFixed(1):Math.round(pc)}%</i></div>
+      <div class="track"><div class="fill" style="width:${clamp(100-pc,2,100)}%;background:var(--accent)"></div></div>
+    </div>
+    <div class="lrow" style="margin-top:7px"><span>隊上定位</span><b>${esc(R.n)}</b></div>
+    <p class="phint" style="margin-top:2px">${esc(R.d)}</p>
+    <div class="lrow"><span>體系適配</span><b>${esc(f.n)}</b></div>
+    <p class="phint" style="margin-top:2px">${esc(f.d)}</p>
+    <h5 class="sch">下一道門檻</h5>
+    ${S.rows.map(r=>{
+      const ok=r.reqs.length&&r.reqs.every(q=>q.ok)&&!r.blocked;
+      const band=r.p!=null?oddsBand(r.p):null;
+      return `<div class="gate${ok?' ok':''}${r.blocked?' off':''}">
+        <div class="gt"><b>${esc(r.n)}</b>${ok?'<span class="gk on">已達標</span>'
+          :r.blocked?'<span class="gk off">路線未開</span>':'<span class="gk">尚未達標</span>'}</div>
+        ${r.reqs.map(q=>`<div class="greq"><span>${esc(q.lab)} ${q.need}</span>
+          <b class="${q.ok?'up':'down'}">你 ${q.cur}${q.ok?' ✓':`　還差 ${q.gap}`}</b></div>`).join('')}
+        ${band?`<div class="greq"><span>過關機率</span><b class="bd-${band.k}">${band.n}</b></div>`:''}
+        <p class="gn">${esc(r.note)}</p>
+      </div>`;}).join('')}
+    <p class="phint">只列出你正在追的下一段，走到了自然會看到再下一段。</p>
+  </div>`;
+}
+
+function attrName(k){ return (ATTRS.find(a=>a.k===k)||{}).n||k; }
+/* 屬性列：now 填滿到當下值，當下值處插一根亮游標，天賦上限處插一根刻度 */
+function attrRow(at,o){
+  const cur=G.a[at.k],cap=o.cap,gain=o.gain||0,add=o.add||0;
+  /* 已經分配的點數也算進去：再加下去只會被天賦上限吃掉，那顆＋要直接停用 */
+  const maxed=(cur+gain)>=cap-0.05;
+  const w=POS[G.pos].w[at.k]||0;
+  return `<div class="arow">
+    <span class="nm${w>=0.14?' key':''}">${at.n}</span>
+    <span class="bar">
+      <span class="now" style="width:${cur}%"></span>
+      ${gain>0?`<span class="add" style="left:${cur}%;width:${Math.min(gain,99-cur)}%"></span>`:''}
+      <span class="cap" style="left:${cap}%" title="天賦上限 ${cap}"></span>
+      <span class="cur" style="left:${cur}%" title="目前 ${cur.toFixed(1)}"></span>
+    </span>
+    <span class="num"><b>${cur.toFixed(1)}</b>${gain>0?`<i>+${gain.toFixed(1)}</i>`:''}<u>/${cap}</u></span>
+    ${o.edit?`<span class="pm">
+      <button data-dec="${at.k}" ${add<=0?'disabled':''} aria-label="${at.n} 減少">−</button>
+      <button data-inc="${at.k}" ${o.left<=0||maxed?'disabled':''} aria-label="${at.n} 增加">＋</button>
+    </span>`:''}
+  </div>`;
+}
+function deltaHTML(ds){
+  if(!ds||!ds.length) return '';
+  return `<div class="delta">${ds.map(d=>
+    `<span class="chip ${d.v>0?'up':d.v<0?'down':''}">${attrName(d.k)} ${d.v>=0?'+':''}${d.v}${
+      d.capped?`<i class="capnote">／天賦上限只吃得下這些（原本 +${d.capped}）</i>`:''
+    }</span>`).join('')}</div>`;
+}
+function cardHTML(c){
+  if(c.kind==='open'){
+    return `<div class="card hl"><div class="eyebrow"><b>${esc(c.title)}</b></div><p>${esc(c.body)}</p></div>`;
+  }
+  let cls='card',inner='';
+  if(c.kind==='event'&&c.ok===false) cls+=' bad';
+  if(c.champ||c.hl) cls+=' hl';
+  if(c.injury&&c.injury.severe) cls+=' bad';
+
+  inner+=`<div class="eyebrow">${c.eyebrow?`<span>${esc(c.eyebrow)}</span>`:''}<b>${esc(c.title)}</b></div>`;
+  if(c.body) inner+=`<p>${esc(c.body).replace(/\n/g,'<br>')}</p>`;
+
+  if(c.kind==='result'&&c.stats){
+    const s=c.stats;
+    if(s.miss){
+      inner+=`<div class="stat-line"><span>出賽 <b>0</b></span><span>整季報銷</span></div>`;
+    }else{
+      inner+=`<div class="stat-line">
+        <span>出賽 <b>${s.gp}</b></span>
+        <span>得分 <b>${s.pts}</b></span>
+        <span>籃板 <b>${s.reb}</b></span>
+        <span>助攻 <b>${s.ast}</b></span>
+        <span>抄截 <b>${s.stl}</b></span>
+        <span>阻攻 <b>${s.blk}</b></span>
+        <span>投籃 <b>${s.fg}%</b></span>
+        <span>三分 <b>${s.tp}%</b></span>
+        <span>罰球 <b>${s.ft}%</b></span>
+        <span>單場最高 <b>${s.hi}</b></span>
+        <span>戰績 <b>${esc(s.rec)}</b></span>
+      </div>
+      <div class="delta"><span class="chip">球季態度 · ${esc(SEASON[c.attitude||'steady'].n)}
+        ${(SEASON[c.attitude||'steady'].stat!==1?`（場均 ×${SEASON[c.attitude].stat}）`:'')}</span>${
+        c.role?`<span class="chip rl-${c.role}">隊上定位 · ${esc(ROLES[c.role].n)}</span>`:''}</div>`;
+      /* 同儕定位：讓玩家知道這個綜合在這個聯盟裡到底算什麼 */
+      if(c.peer) inner+=`<div class="peerline">在 ${esc(c.peer.short)} 排名
+        <b>第 ${c.peer.rank.toLocaleString()}</b> ／ ${c.peer.size.toLocaleString()} 人
+        <em>${esc(c.peer.tier)}</em></div>`;
+    }
+    if(c.pay) inner+=`<div class="delta"><span class="chip up">年薪 +${c.pay.toLocaleString()} 萬</span>${
+      c.minDeal?'<span class="chip down">底薪約 · 上場時間不保證</span>':''}</div>`;
+    if(c.awards&&c.awards.length)
+      inner+=`<div class="delta">${c.awards.map(a=>`<span class="chip trait">${esc(a)}</span>`).join('')}</div>`;
+  }
+  if(c.miles&&c.miles.length)
+    inner+=`<div class="delta">${c.miles.map(m=>
+      `<span class="chip mile">🏅 ${esc(m.n)}</span>`).join('')}</div>`;
+  inner+=deltaHTML(c.deltas);
+  if(c.decline&&c.decline.length)
+    inner+=`<div class="delta"><span class="chip down" style="opacity:.85">歲月：${c.decline.map(d=>attrName(d.k)+' '+d.v).join('、')}</span></div>`;
+  if(c.injury)
+    inner+=`<div class="delta"><span class="chip down">${c.injury.severe?'重傷':'傷勢'} — ${esc(c.injury.text)}</span></div>`;
+  if(c.newTraits&&c.newTraits.length)
+    inner+=`<div class="delta">${c.newTraits.map(t=>
+      `<span class="chip trait">獲得特質 · ${esc(TRAITS[t].n)}</span>`).join('')}</div>`;
+  if(c.ovr&&c.ovr[1]!==c.ovr[0])
+    inner+=`<div class="delta"><span class="chip ${c.ovr[1]>=c.ovr[0]?'up':'down'}">綜合 ${c.ovr[0]} → ${c.ovr[1]}</span></div>`;
+  return `<div class="${cls}">${inner}</div>`;
+}
+
+/* =========================== 動作面板 =========================== */
+function dock(){
+  const p=G.pending;
+  if(!p) return '';
+  if(p.type==='train') return dockTrain(p);
+  if(p.type==='event') return dockEvent(p);
+  if(p.type==='result') return dockResult();
+  if(p.type==='branch') return dockBranch(p);
+  return '';
+}
+function shotHTML(s){
+  return `<div class="shot ${s.k}${s.hot?' hot':''}" aria-label="${s.n}，${s.v} 點">
+    <span class="v">${s.v}</span><span class="r">${s.n}</span></div>`;
+}
+const pct=v=>Math.round(v*100)+'%';
+/* 這兩個選擇合起來會把負荷推到哪、受傷率變多少——當場算給玩家看 */
+function riskHTML(g,intens,att){
+  const r=injuryRisk(g,intens,att);
+  const d=r.load-g.load;
+  const col=r.band.k==='danger'?'var(--bad)':r.band.k==='warn'?'var(--warn)':'var(--good)';
+  return `<div class="risk">
+    <div class="risk-row">
+      <span class="risk-k">這兩個選擇的代價</span>
+      <span class="risk-v">負荷 <b>${Math.round(g.load)}</b> → <b style="color:${col}">${Math.round(r.load)}</b>
+        <i>${d>=0?'+':''}${Math.round(d)}</i> · ${r.band.n}</span>
+    </div>
+    <div class="track"><div class="fill" style="width:${r.load}%;background:${col}"></div></div>
+    <div class="risk-row" style="margin-top:5px">
+      <span class="risk-k">本季受傷機率</span>
+      <span class="risk-v"><b style="color:${r.any>=0.28?'var(--bad)':r.any>=0.14?'var(--warn)':'var(--good)'}">${pct(r.any)}</b>
+        <i>其中重傷 ${pct(r.severe)}</i></span>
+    </div>
+  </div>`;
+}
+/* 這批分配會把綜合推到哪——權重本來就在 POS 裡，當場算給玩家看 */
+function overallOf(a,pos){
+  const w=POS[pos].w; let s=0;
+  for(const k in w) s+=a[k]*w[k];
+  return s;
+}
+function dockTrain(p){
+  const pts=trainPoints(G,INTENS);
+  const used=Object.values(ALLOC).reduce((s,v)=>s+v,0);
+  const left=pts-used;
+  const prev=previewAlloc(G,ALLOC);
+  const after={};
+  for(const at of ATTRS) after[at.k]=G.a[at.k]+(prev[at.k]||0);
+  const ovrNow=overallOf(G.a,G.pos),ovrNext=overallOf(after,G.pos),ovrGain=ovrNext-ovrNow;
+  /* 放行條件必須與「＋鍵是否停用」用同一個判準（attrRow 的 maxed）。
+     兩邊各用一套的話，會出現每顆＋都停用、完成訓練也停用的死鎖。 */
+  const spendable=ATTRS.some(at=>(G.a[at.k]+(prev[at.k]||0))<G.pot[at.k]-0.05);
+  return `<div class="dock"><div class="dock-in">
+    <p class="prompt"><span class="q">${stageLabel(G)} · 季初加練</span>
+      加練 ${p.shots.length} 次出手，決定這一季的訓練點數。</p>
+    <div class="tray">${p.shots.map(shotHTML).join('')}</div>
+    ${p.heat>1
+      ? `<p class="heat">${esc(p.heatName)} ×${p.heat} <span>· 連續命中 ${p.streak} 記 · ${p.raw} → ${p.base} 點</span></p>`
+      : `<p class="heat"><span>命中 ${p.shots.filter(s=>s.make).length}／${p.shots.length}${
+          p.streak>=2?`，最長連 ${p.streak} 記`:''}，連 4 記以上才會開始發燙 · 共 ${p.base} 點</span></p>`}
+    <div class="seclab">① 休賽季訓練 — 決定拿到多少點數</div>
+    <div class="opts" style="margin-bottom:10px">
+      ${Object.values(INTENSITY).map(it=>`
+        <button class="opt" data-int="${it.k}" ${it.k===INTENS?'style="border-color:var(--accent)"':''}>
+          <span class="tag ${it.k==='push'?'push':it.k==='safe'?'safe':'norm'}">${it.k==='push'?'拚':it.k==='safe'?'保':'穩'}</span>
+          <span class="body"><span class="t">${it.n} <span class="odds">→ ${Math.max(1,Math.round(p.base*it.mult))} 點</span></span>
+          <span class="d">${it.d}</span></span>
+        </button>`).join('')}
+    </div>
+    <div class="seclab">② 球季態度 — 決定這一季怎麼打</div>
+    <div class="seg" style="margin-bottom:6px">
+      ${Object.values(SEASON).map(s=>`
+        <button class="segbtn" data-att="${s.k}" aria-pressed="${s.k===ATT}">
+          <b>${s.n}</b><span>場均 ×${s.stat}</span>
+        </button>`).join('')}
+    </div>
+    <p class="segdesc">${esc(SEASON[ATT].d)}</p>
+    ${riskHTML(G,INTENS,ATT)}
+    <div class="pool two">
+      <div class="pl"><span>剩餘訓練點數</span><b>${left}</b> / ${pts}</div>
+      <div class="pr"><span>這樣分配的綜合</span>
+        <b>${ovrNow.toFixed(1)} → <em>${ovrNext.toFixed(1)}</em></b>
+        <i>${ovrGain>0.049?'+'+ovrGain.toFixed(1):'尚未分配'}</i></div>
+    </div>
+    <div class="attrs">
+      ${ATTRS.map(at=>attrRow(at,{cap:G.pot[at.k],add:ALLOC[at.k]||0,gain:prev[at.k]||0,left:left,edit:true})).join('')}
+    </div>
+    <div class="btn-row">
+      <button class="btn ghost" id="autoBtn" ${spendable?'':'disabled'}>自動分配</button>
+      <button class="btn ghost" id="resetBtn" ${used>0?'':'disabled'}>重設分配</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="doTrain" ${left>0&&spendable?'disabled':''}>${
+        !spendable?'天賦已練滿 ▸':left>0?`還有 ${left} 點沒分配`:'完成訓練 ▸'}</button>
+    </div>
+    <p class="hint">${spendable
+      ?'灰色刻度是這項屬性的天賦上限，越接近上限，同樣的點數換到的成長越少。投籃、三分、心理越高，加練時的手感分佈越好。'
+      :`所有屬性都碰到天賦上限了，剩下的 ${left} 點無處可去——再怎麼練也吃不進去。`
+       +'到這一步之後，變強只能靠事件把「天賦上限」本身推高。'}</p>
+  </div></div>`;
+}
+/* 成功率只給粗略帶：要讓玩家知道自己在賭什麼，但不要變成在算數學 */
+function oddsHTML(p){
+  if(p==null) return '';
+  const b=oddsBand(p);
+  return ` <span class="odds bd-${b.k}">${b.n}</span>`;
+}
+function optsHTML(opts,attr){
+  return `<div class="opts">
+    ${opts.map((o,i)=>`
+      <button class="opt" data-${attr}="${i}">
+        <span class="tag ${o.kind==='push'?'push':o.kind==='safe'?'safe':'norm'}">${o.kind==='push'?'拚':o.kind==='safe'?'保':'穩'}</span>
+        <span class="body"><span class="t">${esc(o.label)}${oddsHTML(o.p)}</span>
+        <span class="d">${esc(o.desc)}</span></span>
+      </button>`).join('')}
+  </div>`;
+}
+function dockEvent(p){
+  return `<div class="dock"><div class="dock-in">
+    <p class="prompt"><span class="q">賽季中 · ${esc(p.title)}</span>${esc(p.text).replace(/\n/g,'<br>')}</p>
+    ${optsHTML(p.opts,'ev')}
+    <p class="hint">成功率只標粗略帶，不給精確數字——真正上場時你也不會知道是幾成。</p>
+  </div></div>`;
+}
+function dockResult(){
+  return `<div class="dock"><div class="dock-in">
+    <button class="btn" id="nextBtn">進入下一年 ▸</button>
+  </div></div>`;
+}
+function dockBranch(p){
+  return `<div class="dock"><div class="dock-in">
+    <p class="prompt"><span class="q">抉擇 · ${esc(p.title)}</span>${esc(p.text).replace(/\n/g,'<br>')}</p>
+    ${optsHTML(p.opts,'br')}
+  </div></div>`;
+}
+
+function wireDock(){
+  const d=document.querySelector('.dock'); if(!d) return;
+  d.addEventListener('click',e=>{
+    const t=e.target;
+    const intBtn=t.closest('[data-int]');
+    if(intBtn){ INTENS=intBtn.dataset.int; clampAlloc(); render(); return; }
+    const attBtn=t.closest('[data-att]');
+    if(attBtn){ ATT=attBtn.dataset.att; render(); return; }
+    const inc=t.closest('[data-inc]');
+    if(inc){ const k=inc.dataset.inc; ALLOC[k]=(ALLOC[k]||0)+1; render(); return; }
+    const dec=t.closest('[data-dec]');
+    if(dec){ const k=dec.dataset.dec; ALLOC[k]=Math.max(0,(ALLOC[k]||0)-1); render(); return; }
+    if(t.closest('#autoBtn')){ autoAlloc(); render(); return; }
+    if(t.closest('#resetBtn')){ resetAlloc(); render(); return; }
+    if(t.closest('#doTrain')){
+      applyTrain(G,INTENS,ALLOC,ATT); ALLOC={}; render(); scrollLog(); return;
+    }
+    const ev=t.closest('[data-ev]');
+    if(ev){ applyEvent(G,+ev.dataset.ev); render(); scrollLog(); return; }
+    if(t.closest('#nextBtn')){
+      advance(G);
+      if(G.phase==='end'){ renderEnd(); return; }
+      ALLOC={};INTENS='normal';ATT='steady';
+      render(); scrollLog(); return;
+    }
+    const br=t.closest('[data-br]');
+    if(br){
+      applyBranch(G,+br.dataset.br);
+      if(G.phase==='end'){ renderEnd(); return; }
+      ALLOC={};INTENS='normal';ATT='steady';
+      render(); scrollLog(); return;
+    }
+  });
+}
+function clampAlloc(){
+  const pts=trainPoints(G,INTENS);
+  let used=Object.values(ALLOC).reduce((s,v)=>s+v,0);
+  const keys=Object.keys(ALLOC);
+  while(used>pts&&keys.length){
+    for(let i=keys.length-1;i>=0&&used>pts;i--){
+      if(ALLOC[keys[i]]>0){ ALLOC[keys[i]]--; used--; }
+    }
+  }
+}
+function autoAlloc(){
+  const pts=trainPoints(G,INTENS);
+  ALLOC={};
+  const w=POS[G.pos].w;
+  /* gainFor 的第三個參數是「已累積的成長值」，不是點數。
+     之前傳點數會低估已投入的進度，害貪婪法一直往同一項倒點。 */
+  const acc={};
+  let left=pts;
+  while(left>0){
+    let best=null,bs=-1,bg=0;
+    for(const at of ATTRS){
+      const g0=gainFor(G,at.k,acc[at.k]||0);
+      if(g0<=0) continue;
+      if(G.a[at.k]+(acc[at.k]||0)>=G.pot[at.k]) continue;
+      const s=(w[at.k]||0.01)*g0;
+      if(s>bs){ bs=s; best=at.k; bg=g0; }
+    }
+    if(!best) break;
+    ALLOC[best]=(ALLOC[best]||0)+1;
+    acc[best]=(acc[best]||0)+bg;
+    left--;
+  }
+}
+function resetAlloc(){ ALLOC={}; }
+function scrollLog(){
+  requestAnimationFrame(()=>{
+    const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({top:document.body.scrollHeight,behavior:reduce?'auto':'smooth'});
+  });
+}
+
+/* =========================== 生涯履歷 =========================== */
+const lgKey=short=>Object.keys(LEAGUES).find(k=>LEAGUES[k].short===short);
+function renderEnd(){
+  const s=G.summary,c=G.career,S=G.seasons;
+  const played=S.filter(x=>!x.miss&&x.gp>0);
+  const topLg=S.reduce((m,x)=>{
+    const k=lgKey(x.lg),mk=lgKey(m);
+    return (k&&mk&&LEAGUES[k].tier>LEAGUES[mk].tier)?x.lg:m;},'HBL');
+
+  /* 分聯盟統計 */
+  const byLg=[];
+  for(const x of S){
+    let e=byLg.find(z=>z.lg===x.lg);
+    if(!e){ e={lg:x.lg,seasons:0,gp:0,pts:0,reb:0,ast:0,champs:0,awards:0,y0:x.y,y1:x.y,roles:{}}; byLg.push(e); }
+    e.seasons++; e.gp+=x.gp; e.pts+=x.pts*x.gp; e.reb+=x.reb*x.gp; e.ast+=x.ast*x.gp;
+    e.champs+=x.champ?1:0; e.awards+=x.awards.length; e.y1=x.y;
+    if(x.role) e.roles[x.role]=(e.roles[x.role]||0)+1;
+  }
+  /* 每個聯盟取出現最多次的定位（同票時取較高的） */
+  byLg.forEach(e=>{ e.role=ROLE_ORDER.reduce((m,k)=>
+    (e.roles[k]||0)>(e.roles[m]||0)?k:m,ROLE_ORDER[ROLE_ORDER.length-1]); });
+  byLg.sort((a,b)=>(LEAGUES[lgKey(b.lg)]||{tier:0}).tier-(LEAGUES[lgKey(a.lg)]||{tier:0}).tier);
+
+  /* 巔峰球季：用「得分＋籃板＋助攻」加權挑最好的一季 */
+  const peak=played.slice().sort((a,b)=>
+    (b.pts+b.reb*1.2+b.ast*1.5+b.awards.length*4)-(a.pts+a.reb*1.2+a.ast*1.5+a.awards.length*4))[0];
+
+  /* 獎項分類 */
+  const cnt=t=>G.awards.filter(a=>a.t===t).length;
+  const mvpY=G.awards.filter(a=>a.t.indexOf('年度 MVP')>=0);
+  const fmvp=cnt('總冠軍賽 MVP');
+  const otherAw={};
+  G.awards.forEach(a=>{ if(a.t.indexOf('年度 MVP')<0&&a.t!=='總冠軍賽 MVP'&&a.t.indexOf('冠軍')<0)
+    otherAw[a.t]=(otherAw[a.t]||0)+1; });
+
+  const goodT=G.traits.filter(t=>TRAITS[t]&&TRAITS[t].good);
+  const badT=G.traits.filter(t=>TRAITS[t]&&!TRAITS[t].good);
+  const whyTxt={washed:'實力跟不上，市場上沒有人開價',broken:'傷太多，醫生勸退',
+    nomarket:'年紀到了，沒有球隊再打電話來',undrafted:'選秀落選，沒能踏進職業',
+    choice:'自己決定在還走得動的時候離開'}[G.retiredWhy]||'';
+  const injMinor=S.filter(x=>x.injury==='minor').length;
+  const injSevere=G.injuries;
+
+  app.innerHTML=`
+  <div class="hero" style="padding:20px 0 10px">
+    <div class="mark">Career Résumé</div>
+    <h1 style="font-size:1.6em">${esc(G.name)}</h1>
+    <p class="sub">${G.pos} ${POS[G.pos].n} · ${esc(STYLES[G.style].n)} · ${G.height} 公分<br>
+      ${S[0]?S[0].y:G.year} – ${G.year}　${S.length} 個球季　${G.age} 歲退休</p>
+  </div>
+  <div class="resume">
+    <div class="resume-hd">
+      <div class="t">Final Grade</div>
+      <h2>${s.grade.g} — ${s.grade.t}</h2>
+      <div class="g">最高殿堂 ${esc(topLg)}　·　生涯最高綜合 ${s.bestOvr}${whyTxt?'　·　'+esc(whyTxt):''}</div>
+    </div>
+    <div class="resume-bd">
+
+      ${G.afterlife?`<div class="after"><div class="af-t">退役之後</div>
+        <p>${esc(G.afterlife)}</p></div>`:''}
+
+      <div class="sec first"><h4>生涯場均</h4>
+        <div class="big five">
+          <div><div class="n">${s.pts}</div><div class="l">得分</div></div>
+          <div><div class="n">${s.reb}</div><div class="l">籃板</div></div>
+          <div><div class="n">${s.ast}</div><div class="l">助攻</div></div>
+          <div><div class="n">${s.stl}</div><div class="l">抄截</div></div>
+          <div><div class="n">${s.blk}</div><div class="l">阻攻</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><h4>生涯命中率</h4>
+        <div class="big">
+          <div><div class="n">${s.fg}<u>%</u></div><div class="l">投籃</div></div>
+          <div><div class="n">${s.tp}<u>%</u></div><div class="l">三分</div></div>
+          <div><div class="n">${s.ft}<u>%</u></div><div class="l">罰球</div></div>
+          <div><div class="n">${s.gp}</div><div class="l">出賽場次</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><h4>生涯累計</h4>
+        <div class="big">
+          <div><div class="n">${s.totalPts.toLocaleString()}</div><div class="l">總得分</div></div>
+          <div><div class="n">${s.totalReb.toLocaleString()}</div><div class="l">總籃板</div></div>
+          <div><div class="n">${s.totalAst.toLocaleString()}</div><div class="l">總助攻</div></div>
+          <div><div class="n">${s.money.toLocaleString()}</div><div class="l">生涯薪 (萬)</div></div>
+        </div>
+      </div>
+
+      <div class="sec"><h4>榮譽</h4>
+        <div class="honors">
+          <div class="hcell${s.champs?' on':''}"><b>${s.champs}</b><span>總冠軍</span></div>
+          <div class="hcell${mvpY.length?' on':''}"><b>${mvpY.length}</b><span>年度 MVP</span></div>
+          <div class="hcell${fmvp?' on':''}"><b>${fmvp}</b><span>總冠軍賽 MVP</span></div>
+          <div class="hcell${cnt('年度第一隊')?' on':''}"><b>${cnt('年度第一隊')}</b><span>年度第一隊</span></div>
+        </div>
+        ${mvpY.length?`<p class="hnote">年度 MVP 年份：${mvpY.map(a=>a.y+' ('+a.lg+')').join('、')}</p>`:''}
+        ${Object.keys(otherAw).length?`<div class="tw" style="margin-top:7px">
+          ${Object.keys(otherAw).map(k=>`<span class="chip">${esc(k)}${otherAw[k]>1?' ×'+otherAw[k]:''}</span>`).join('')}
+        </div>`:''}
+      </div>
+
+      <div class="hof">
+        <div class="v">${s.hof}<span>/100</span></div>
+        <div class="l">名人堂票數　${s.hofIn
+          ?'<b style="color:var(--accent)">入選 · 球衣退休</b>'
+          :`差 ${70-s.hof} 票落選（門檻 70）`}</div>
+      </div>
+
+      ${peak?`<div class="sec"><h4>巔峰球季</h4>
+        <div class="peak">
+          <div class="pk-y">${peak.y}　${peak.age} 歲　${esc(peak.lg)} ${esc(peak.team)}</div>
+          <div class="pk-s">
+            <span><b>${peak.pts}</b>分</span><span><b>${peak.reb}</b>籃板</span><span><b>${peak.ast}</b>助攻</span>
+            <span><b>${peak.stl}</b>抄截</span><span><b>${peak.blk}</b>阻攻</span>
+          </div>
+          <div class="pk-a">投籃 ${peak.fg}%　三分 ${peak.tp}%　罰球 ${peak.ft}%　單場最高 ${peak.hi} 分</div>
+          <div class="pk-a">綜合 ${peak.ovr}　${esc(peak.rec)}${peak.awards.length?'　'+esc(peak.awards.join('、')):''}</div>
+        </div>
+      </div>`:''}
+
+      <div class="sec"><h4>生涯紀錄</h4>
+        <div class="honors">
+          <div class="hcell${s.hiGame>=40?' on':''}"><b>${s.hiGame}</b><span>單場最高</span></div>
+          <div class="hcell${s.bestPts>=20?' on':''}"><b>${s.bestPts}</b><span>單季最佳場均</span></div>
+          <div class="hcell${s.bestStreak>=5?' on':''}"><b>${s.bestStreak}</b><span>最長連續全勤</span></div>
+          <div class="hcell${s.starYears?' on':''}"><b>${s.starYears}</b><span>當家球星季數</span></div>
+        </div>
+        ${s.miles.length?`<div class="tw" style="margin-top:7px">
+          ${s.miles.map(m=>`<span class="chip mile">🏅 ${esc(m)}</span>`).join('')}
+        </div><p class="hnote">生涯達成 ${s.miles.length}／${MILESTONES.length} 個里程碑</p>`
+        :`<p class="hnote">這趟生涯沒有達成任何里程碑（全部共 ${MILESTONES.length} 個）。</p>`}
+      </div>
+
+      <div class="sec"><h4>各階段足跡</h4>
+        <div class="lgtab scroll-x"><table>
+          <thead><tr><th>聯盟</th><th>年份</th><th>季</th><th>場均</th><th>主要定位</th><th>冠軍</th></tr></thead>
+          <tbody>${byLg.map(e=>`<tr>
+            <td class="lg">${esc(e.lg)}</td>
+            <td class="dim">${e.y0}${e.y1!==e.y0?'–'+String(e.y1).slice(2):''}</td>
+            <td>${e.seasons}</td>
+            <td>${e.gp?`${r1(e.pts/e.gp)}/${r1(e.reb/e.gp)}/${r1(e.ast/e.gp)}`:'—'}</td>
+            <td class="dim">${esc(ROLES[e.role]?ROLES[e.role].n:'—')}</td>
+            <td>${e.champs||'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+
+      <div class="sec"><h4>身體帳單</h4>
+        <div class="honors">
+          <div class="hcell${injSevere?' bad':''}"><b>${injSevere}</b><span>重傷</span></div>
+          <div class="hcell${injMinor?' bad':''}"><b>${injMinor}</b><span>小傷</span></div>
+          <div class="hcell"><b>${S.filter(x=>x.miss).length}</b><span>報銷球季</span></div>
+          <div class="hcell"><b>${G.teamsPlayed.length}</b><span>效力球隊</span></div>
+        </div>
+        <p class="hnote">天生體質「${esc(duraBand(G.dura).n)}」——${esc(duraBand(G.dura).d)}
+          這是種子開局就決定的，不是你打壞的。</p>
+      </div>
+
+      ${goodT.length||badT.length?`<div class="sec"><h4>生涯特質 ${G.traits.length}／${Object.keys(TRAITS).length}</h4><div class="tw">
+        ${goodT.map(t=>`<span class="chip trait" title="${esc(TRAITS[t].d)}">${esc(TRAITS[t].n)}</span>`).join('')}
+        ${badT.map(t=>`<span class="chip down" title="${esc(TRAITS[t].d)}">${esc(TRAITS[t].n)}</span>`).join('')}
+      </div><p class="hnote">點住特質可看解鎖條件</p></div>`:''}
+
+      ${G.natl.length?`<div class="sec"><h4>中華隊 ${G.natl.length} 次徵召</h4>
+        <div class="lgtab scroll-x"><table>
+          <thead><tr><th>年份</th><th>賽事</th><th>你的打法</th><th>結果</th><th>海外曝光</th></tr></thead>
+          <tbody>${G.natl.map(n=>`<tr>
+            <td class="dim">${n.y}</td><td class="lg">${esc(n.c)}</td>
+            <td>${esc(n.planName||'—')}</td>
+            <td class="${n.big?'lg':'dim'}">${n.big?'打出代表作':'小組止步'}</td>
+            <td class="dim">+${n.buzz!=null?n.buzz:'—'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+        <p class="hnote">海外曝光累計 ${s.natlBuzz}，每 1 點讓每季被海外球隊相中的機率 +4.5%。</p>
+      </div>`:''}
+
+      <div class="sec"><h4>生涯逐年</h4>
+        <div class="timeline">
+          <div class="trow hd"><span class="y">年份</span><span class="w">球隊／事蹟</span><span class="s">得/籃/助</span></div>
+          ${S.map(x=>`<div class="trow${x.champ?' champ':''}${x.miss?' miss':''}">
+            <span class="y">${x.y} <u>${x.age}</u></span>
+            <span class="w"><em>${esc(x.lg)}</em> ${esc(x.team)}${x.champ?' 🏆':''}${
+              x.injury==='severe'?' <i class="tag-inj">重傷</i>':x.injury==='minor'?' <i class="tag-inj min">傷</i>':''}${
+              x.awards.length?`<br><i class="tag-aw">${esc(x.awards.join('、'))}</i>`:''}</span>
+            <span class="s">${x.miss?'<i>報銷</i>':`${x.pts}/${x.reb}/${x.ast}`}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="seedline">世界種子　<b>${esc(G.seed)}</b><br>相同種子＋相同選擇＝相同人生</div>
+      <div class="btn-row">
+        <button class="btn ghost" id="copyBtn">複製生涯摘要</button>
+        <button class="btn" id="againBtn">再來一次</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn ghost" id="sameSeedBtn">用同一顆種子重來</button>
+      </div>
+    </div>
+  </div>`;
+
+  $('#copyBtn').addEventListener('click',()=>{
+    const txt=[
+      `【籃球人生】${G.name}　${G.pos}／${STYLES[G.style].n}／${G.height}cm`,
+      `評價 ${s.grade.g} — ${s.grade.t}　最高殿堂 ${topLg}`,
+      `${S.length} 季　場均 ${s.pts} 分 ${s.reb} 籃板 ${s.ast} 助攻　單場最高 ${s.hiGame}`,
+      `總冠軍 ${s.champs}　年度 MVP ${mvpY.length}　FMVP ${fmvp}　生涯薪 ${s.money.toLocaleString()} 萬`,
+      s.hofIn?'名人堂入選 · 球衣退休':`名人堂票數 ${s.hof}／100（門檻 70）`,
+      s.miles.length?`里程碑：${s.miles.join('、')}`:'',
+      goodT.length?'特質：'+goodT.map(t=>TRAITS[t].n).join('、'):'',
+      `種子 ${G.seed}`,
+    ].filter(Boolean).join('\n');
+    copyText(txt);
+  });
+  $('#againBtn').addEventListener('click',()=>{ G=null; history.replaceState(null,'',location.pathname); renderStart(); window.scrollTo(0,0); });
+  $('#sameSeedBtn').addEventListener('click',()=>{
+    const sd=G.seed,nm=G.name,ps=G.pos,st=G.style;
+    G=createGame(sd,nm,ps,st);
+    ALLOC={};INTENS='normal';ATT='steady';PANEL=null;
+    render(); window.scrollTo(0,0);
+  });
+  window.scrollTo(0,0);
+}
+
+renderStart();
+</script>
+
+</body>
+</html>
