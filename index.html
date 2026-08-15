@@ -2300,8 +2300,8 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 /* 複製：navigator.clipboard 只在安全情境下存在，用 file:// 直接開這個檔時是 undefined
    （不是回傳失敗的 Promise，是整個物件不存在）。所以要先探再退回舊做法，
    不然單機版按下去會直接丟 TypeError。 */
-function copyText(txt){
-  const ok=()=>toast('已複製生涯摘要'), no=()=>toast('複製失敗，請手動選取');
+function copyText(txt,okMsg){
+  const ok=()=>toast(okMsg||'已複製生涯摘要'), no=()=>toast('複製失敗，請手動選取');
   if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(txt).then(ok,()=>fallbackCopy(txt)?ok():no());
     return;
@@ -2326,6 +2326,25 @@ function fallbackCopy(txt){
 function urlSeed(){
   const m=location.search.match(/[?&]seed=([a-z0-9]+)/i);
   return m?m[1]:null;
+}
+function urlPick(k,valid,fallback){
+  const m=location.search.match(new RegExp('[?&]'+k+'=([A-Za-z0-9]+)','i'));
+  return m&&valid.indexOf(m[1])>=0?m[1]:fallback;
+}
+/* 網址要能直接分享一局：開始生涯時把 種子／位置／球風 寫進網址，
+   別人貼上就是同一段人生的起點。名字不進亂數，所以不必帶。
+   用 replaceState 不用 pushState——不要讓「上一頁」變成回到開局前。 */
+function syncUrl(sd,pos,sty){
+  try{
+    history.replaceState(null,'',location.pathname
+      +`?seed=${encodeURIComponent(sd)}&pos=${pos}&style=${sty}`);
+  }catch(e){ /* 少數瀏覽器在 file:// 下會擋 replaceState，擋掉不影響遊戲 */ }
+}
+function clearUrl(){ try{ history.replaceState(null,'',location.pathname); }catch(e){} }
+function shareUrl(){
+  return location.origin==='null'||location.protocol==='file:'
+    ? null                                   /* 本機開的檔案沒有可以分享的網址 */
+    : location.origin+location.pathname+location.search;
 }
 function randomSeed(){ return makeSeed(Math.random); }
 
@@ -2377,7 +2396,14 @@ function renderStart(){
       你能決定的是球風、每一季的訓練點數往哪裡放，以及每一次要不要賭。</p>
   </div>`;
 
-  let pos='SF',sty='allround';
+  let pos=urlPick('pos',Object.keys(POS),'SF'),sty=urlPick('style',STYLE_KEYS,'allround');
+  /* 網址帶了位置／球風就把畫面對上，不然分享出去的連結會開出不一樣的人 */
+  if(pos!=='SF'||sty!=='allround'){
+    document.querySelectorAll('.posbtn').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.pos===pos)));
+    $('#posDesc').textContent=POS[pos].d;
+    document.querySelectorAll('.stybtn').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.sty===sty)));
+    $('#styDesc').textContent=STYLES[sty].d;
+  }
   $('#posGrid').addEventListener('click',e=>{
     const b=e.target.closest('.posbtn'); if(!b) return;
     pos=b.dataset.pos;
@@ -2396,6 +2422,7 @@ function renderStart(){
     const sd=($('#seedIn').value||'').trim()||seed;
     G=createGame(sd,nm,pos,sty);
     ALLOC={};INTENS='normal';ATT='steady';PANEL=null;
+    syncUrl(sd,pos,sty);
     render();
     window.scrollTo(0,0);
   });
@@ -3000,6 +3027,7 @@ function renderEnd(){
         <button class="btn" id="againBtn">再來一次</button>
       </div>
       <div class="btn-row">
+        ${shareUrl()?'<button class="btn ghost" id="linkBtn">複製這局的連結</button>':''}
         <button class="btn ghost" id="sameSeedBtn">用同一顆種子重來</button>
       </div>
     </div>
@@ -3018,7 +3046,11 @@ function renderEnd(){
     ].filter(Boolean).join('\n');
     copyText(txt);
   });
-  $('#againBtn').addEventListener('click',()=>{ G=null; history.replaceState(null,'',location.pathname); renderStart(); window.scrollTo(0,0); });
+  if($('#linkBtn')) $('#linkBtn').addEventListener('click',()=>{
+    /* 網址在開始生涯時就已經同步好了，這裡只是讓使用者不必去點網址列 */
+    copyText(shareUrl(),'已複製連結，貼給別人就是同一顆種子');
+  });
+  $('#againBtn').addEventListener('click',()=>{ G=null; clearUrl(); renderStart(); window.scrollTo(0,0); });
   $('#sameSeedBtn').addEventListener('click',()=>{
     const sd=G.seed,nm=G.name,ps=G.pos,st=G.style;
     G=createGame(sd,nm,ps,st);

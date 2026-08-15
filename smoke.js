@@ -270,6 +270,48 @@ say(d.documentElement.getAttribute('data-fs')==='lg','大字模式可切換');
 /* --- 6. 重來 --- */
 click('#againBtn');
 say(has('#startBtn'),'「再來一次」回到開場畫面');
+/* --- 6b. 分享網址：貼上去要開出同一顆種子／位置／球風 --- */
+{
+  const d2=w.document;
+  /* 開一局，網址必須被寫上去 */
+  w.eval("G=null");
+  w.eval("renderStart()");
+  w.eval("document.querySelector('.posbtn[data-pos=\"PG\"]').click()");
+  w.eval("document.querySelector('.stybtn[data-sty=\"shooter\"]').click()");
+  w.eval("document.querySelector('#seedIn').value='sharetest'");
+  w.eval("document.querySelector('#startBtn').click()");
+  const q=w.location.search;
+  say(/seed=sharetest/.test(q),`開始生涯後網址帶上種子（${q}）`);
+  say(/pos=PG/.test(q)&&/style=shooter/.test(q),'網址也帶上位置與球風（不然分享出去會開出不一樣的人）');
+  say(w.location.pathname.indexOf('?')<0,'用 replaceState 改 query，沒有把 query 塞進 path');
+
+  /* 把那段網址餵回開場畫面，選擇必須被還原 */
+  w.eval("G=null; renderStart()");
+  const seedVal=d2.querySelector('#seedIn').value;
+  const posOn=[...d2.querySelectorAll('.posbtn')].find(b=>b.getAttribute('aria-pressed')==='true');
+  const styOn=[...d2.querySelectorAll('.stybtn')].find(b=>b.getAttribute('aria-pressed')==='true');
+  say(seedVal==='sharetest',`重新載入時種子欄自動填回（${seedVal}）`);
+  say(!!posOn&&posOn.dataset.pos==='PG',`位置還原成 PG（${posOn?posOn.dataset.pos:'無'}）`);
+  say(!!styOn&&styOn.dataset.sty==='shooter',`球風還原成三分射手（${styOn?styOn.dataset.sty:'無'}）`);
+  /* 只有一顆被按下，不會兩個同時亮 */
+  say([...d2.querySelectorAll('.posbtn')].filter(b=>b.getAttribute('aria-pressed')==='true').length===1,
+      '位置只有一顆是選取狀態');
+  say([...d2.querySelectorAll('.stybtn')].filter(b=>b.getAttribute('aria-pressed')==='true').length===1,
+      '球風只有一顆是選取狀態');
+
+  /* 亂填的參數要被擋掉，回到預設而不是壞掉 */
+  w.history.replaceState(null,'','/?seed=xx&pos=ZZ&style=nope');
+  w.eval("G=null; renderStart()");
+  const p2=[...d2.querySelectorAll('.posbtn')].find(b=>b.getAttribute('aria-pressed')==='true');
+  const s2=[...d2.querySelectorAll('.stybtn')].find(b=>b.getAttribute('aria-pressed')==='true');
+  say(p2&&p2.dataset.pos==='SF'&&s2&&s2.dataset.sty==='allround','網址帶了不存在的位置／球風會退回預設，不會壞掉');
+
+  /* 「再來一次」要把網址清乾淨，不然會一直開到同一顆種子 */
+  w.history.replaceState(null,'','/?seed=sharetest&pos=PG&style=shooter');
+  w.eval("clearUrl()");
+  say(w.location.search==='','清除網址後 query 是空的（再來一次不會被舊種子綁住）');
+}
+
 
 /* --- 7. 第二輪：走到職業生涯後段，驗退休流程真的有得選 --- */
 console.log('\n  ── 第二輪：刻意打完整個職業生涯 ──');
