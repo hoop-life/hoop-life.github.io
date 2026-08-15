@@ -70,7 +70,10 @@ body{
   font-size:var(--fs-body);
   line-height:1.65;
   -webkit-font-smoothing:antialiased;
-  overflow-x:hidden;
+  /* clip 不是 hidden：overflow-x:hidden 會讓 body 自己變成一個捲動容器，
+     於是整頁多出第二條捲軸，window.scrollTo 捲的是外層、內容卻在內層——
+     捲到哪裡都對不上。clip 只裁切、不生捲動容器。 */
+  overflow-x:clip;
 }
 :root[data-skin="scoreboard"] body,:root:not([data-skin]) body{
   background-image:repeating-linear-gradient(0deg,#ffffff05 0 1px,transparent 1px 3px);
@@ -188,6 +191,21 @@ h5.sch{
 .greq b.up{color:var(--good);} .greq b.down{color:var(--warn);}
 .gate .gn{font-size:.7em;color:var(--muted);margin:3px 0 0;line-height:1.55;}
 
+/* 海外路線圖：七個目的地一次看完 */
+.omap{display:flex;flex-direction:column;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+.orow{display:flex;align-items:baseline;gap:5px;background:var(--panel);padding:4px 7px;flex-wrap:wrap;}
+.orow .on{font-size:.8em;font-weight:700;flex:1 1 7em;min-width:0;}
+.orow .ov{font-family:var(--f-mono);font-size:.66em;font-variant-numeric:tabular-nums;
+  color:var(--muted);white-space:nowrap;flex:0 0 auto;}
+.orow .os{font-family:var(--f-mono);font-size:.58em;letter-spacing:.06em;white-space:nowrap;flex:0 0 auto;
+  border:1px solid var(--line);border-radius:var(--radius);padding:0 4px;color:var(--dim);}
+.orow .od{font-size:.62em;color:var(--dim);flex:1 0 100%;line-height:1.4;}
+.orow.been .on{color:var(--good);} .orow.been .os{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,var(--line));}
+.orow.open .on{color:var(--accent);} .orow.open .os{color:var(--accent);border-color:var(--accent);}
+.orow.short .os{color:var(--warn);}
+.orow.locked{opacity:.6;} .orow.later{opacity:.75;}
+
 /* 成功率粗略帶 */
 .bd-good{color:var(--good);} .bd-mid{color:var(--muted);}
 .bd-warn{color:var(--warn);} .bd-bad{color:var(--bad);}
@@ -254,7 +272,12 @@ h5.sch{
 .chip{
   padding:1px 6px;border-radius:var(--radius);border:1px solid var(--line);
   background:var(--panel2);font-variant-numeric:tabular-nums;white-space:nowrap;
+  max-width:100%;min-width:0;
 }
+/* 內容是一整句話的 chip（傷勢、歲月、天賦上限說明）必須換行。
+   nowrap ＋ flex item 的 min-width:auto 會讓它整條衝出卡片，
+   再被 body 的 overflow-x:hidden 切掉——字就這樣不見了。實測衝出畫面 350px。 */
+.chip.long{white-space:normal;overflow-wrap:anywhere;}
 .chip.up{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,var(--line));}
 .chip.down{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--line));}
 .chip.trait{color:var(--accent);border-color:var(--accent);font-weight:700;}
@@ -278,6 +301,12 @@ h5.sch{
   margin:14px -12px 0;padding:11px 12px 14px;
   background:linear-gradient(transparent,var(--ground) 18px);
 }
+/* 面板比視窗高的時候一定要退回 static。
+   sticky ＋ bottom:0 的意思是「把下緣拉到視窗底部」——面板只要比視窗高，
+   上緣就會被推到畫面外，而且怎麼捲都追不回來（它跟著視窗跑）。
+   季初加練的面板 1180px，任何手機都比它矮，於是最上面的加練骰子與訓練強度
+   永遠看不到。這就是「骰子不見了」。fitDock() 每次 render 後量一次。 */
+.dock.tall{position:static;}
 .dock-in{
   background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
   padding:11px;box-shadow:var(--shadow);
@@ -380,9 +409,11 @@ h5.sch{
   transition:left .3s;border-radius:2px;margin-left:-1px;
   box-shadow:0 0 0 1px var(--panel),0 0 5px -1px var(--ink);
 }
+/* 分配中會變成「40.0+18.3/92」共 12 個字，6.2em 只放得下 9 個——
+   右邊的天賦上限會被切掉。寬度要照最長的那一種算。 */
 .arow .num{
-  font-family:var(--f-mono);font-variant-numeric:tabular-nums;width:6.2em;flex:0 0 auto;
-  text-align:right;font-size:.82em;
+  font-family:var(--f-mono);font-variant-numeric:tabular-nums;width:7.6em;flex:0 0 auto;
+  text-align:right;font-size:.82em;white-space:nowrap;
 }
 .arow .num b{font-weight:800;color:var(--ink);}
 .arow .num i{color:var(--accent);font-style:normal;font-weight:700;}
@@ -610,13 +641,46 @@ const POS={
       w:{handle:.17,pass:.20,three:.14,shoot:.10,iq:.15,def:.09,ath:.08,mind:.07,reb:.00},h:[178,190]},
   SG:{n:'得分後衛',d:'外線火力點。三分與投籃是命脈，最容易靠一手神射打進國際賽。',
       w:{three:.20,shoot:.19,handle:.12,ath:.12,def:.11,iq:.08,mind:.08,pass:.06,reb:.04},h:[183,196]},
-  SF:{n:'小前鋒',  d:'全能鋒線。沒有短板就是最大長處，旅外市場最吃這一味。',
+  /* 這裡原本寫「旅外市場最吃這一味」，但實測小前鋒是五個位置裡最難出國的一個
+     （權重最平均＝綜合最難堆高）。文案不可以跟機制反著講。 */
+  SF:{n:'小前鋒',  d:'全能鋒線。九項都要顧，沒有短板，但也沒有一項能替你把綜合拉開。',
       w:{shoot:.14,three:.14,def:.14,ath:.14,reb:.10,handle:.10,pass:.08,iq:.08,mind:.08},h:[190,203]},
   PF:{n:'大前鋒',  d:'內外兼修的苦工。籃板與防守撐起身價，會投三分就是空間型。',
       w:{reb:.19,def:.18,ath:.14,shoot:.12,iq:.10,three:.09,mind:.08,pass:.06,handle:.04},h:[196,208]},
   C :{n:'中鋒',    d:'禁區屏障。籃板與防守權重最高，但膝蓋負荷也累積得最快。',
       w:{reb:.24,def:.22,ath:.14,iq:.12,shoot:.10,mind:.08,pass:.05,handle:.03,three:.02},h:[201,216]},
 };
+
+/* 位置補正的門檻。
+   綜合是加權平均，而訓練是遞減報酬——權重越集中的位置（中鋒 reb .24＋def .22）
+   越容易把點數整包倒進高權重項，同樣的訓練量換到的綜合就越高。
+   高中畢業當下實測（全程全力以赴＋貪婪分配，1000 局）：
+     綜合 p90　中鋒 67 ／ 得分後衛 65 ／ 控球 64 ／ 大前 62 ／ 小前鋒 60
+   所以「綜合 64」這種單一數字的門檻等於把鋒線判出局——實測跨過 NCAA 門檻的比率
+   中鋒 38.3%、小前鋒 1.1%，而 POS.SF 的說明還寫著「旅外市場最吃這一味」。
+   這裡用權重的 L2 範數（＝集中度）把門檻拉平；係數 122 是照上面那組 p90 量出來的斜率，
+   不是猜的。大學畢業之後天賦上限開始綁住成長，五個位置的 p90 只差 1 分，
+   所以補正只用在高中階段的門檻，後面的門檻本來就公平。 */
+function posConc(pos){
+  const w=POS[pos].w; let s=0;
+  for(const k in w) s+=w[k]*w[k];
+  return Math.sqrt(s);
+}
+const POS_KEYS=Object.keys(POS);
+const POS_CONC_MEAN=POS_KEYS.reduce((s,k)=>s+posConc(k),0)/POS_KEYS.length;
+const POS_GATE_K=122;
+function posGate(pos,base){ return Math.round(base+(posConc(pos)-POS_CONC_MEAN)*POS_GATE_K); }
+
+/* 單項屬性的門檻也要補正，理由一樣：同一個「球商 55」對控球是免費的
+   （權重 .15，貪婪分配本來就會一直往那裡倒），對鋒衛則要拿綜合去換。
+   高中畢業球商中位數實測：控球 64 ／ 中鋒 62 ／ 大前 55 ／ 得分後衛 43 ／ 小前鋒 40，
+   斜率 343 就是照這組數字量出來的。
+   補正之後 NCAA 的達標率從 控球11%／中鋒26%／小前鋒1% 變成 4%～10%。 */
+const ATTR_GATE_K=343;
+function posAttrGate(pos,k,base){
+  const mean=POS_KEYS.reduce((s,p)=>s+(POS[p].w[k]||0),0)/POS_KEYS.length;
+  return Math.round(base+((POS[pos].w[k]||0)-mean)*ATTR_GATE_K);
+}
 
 /* bar＝這個聯盟「稱得上先發」的綜合水準，sd＝該聯盟球員實力的離散程度，
    size＝聯盟總人數。三者只用來換算你在同儕中的排名與隊上定位，不進亂數。 */
@@ -636,9 +700,18 @@ const LEAGUES={
 
 /* 旅外門檻：「厲害的才能出國」 */
 const OVERSEAS=[
-  {lg:'bleague',ovr:72,age:33,from:['plg','t1'],           label:'日本 B.LEAGUE'},
-  {lg:'kbl',    ovr:76,age:32,from:['plg','t1','bleague'], label:'韓國 KBL'},
-  {lg:'nbl',    ovr:79,age:32,from:['bleague','kbl','plg','t1'],label:'澳洲 NBL'},
+  {lg:'bleague',ovr:72,age:33,from:['plg','t1'],           label:'日本 B.LEAGUE',
+   desc:'亞洲最成熟的職業聯賽，薪水是國內的兩倍，台灣球員最常走的一條。'},
+  /* 韓國原本是 76。但 KBL 與 B1 同層級，而 76 比日本的 72 高了四分——
+     所有人都會先拿到日本的報價走掉，走掉之後同層級就被 tier 濾掉，KBL 永遠不會再出現。
+     實測 1000 局只有 5 局踏進過 KBL，等於死內容。拉到 73 之後日本與韓國會在同一年
+     一起進候選名單，變成真的要選一邊，這也是 shortlist 早就寫好要支援兩張報價的原因。 */
+  /* from 不放 bleague：KBL 與 B1 同層級，會被 tier 濾掉，放了也永遠不會生效，
+     只會讓球探報告對著 B1 的球員說「要先待過 B1」。 */
+  {lg:'kbl',    ovr:73,age:32,from:['plg','t1'],           label:'韓國 KBL',
+   desc:'外援名額少、球權集中，數據會比日本好看；但競爭更兇，薪水略低一點。'},
+  {lg:'nbl',    ovr:79,age:32,from:['bleague','kbl','plg','t1'],label:'澳洲 NBL',
+   desc:'體能對抗是另一個檔次，而且 NBA 球探每年都會來看 NBL。'},
   {lg:'euro',   ovr:82,age:32,from:['bleague','kbl','nbl'],label:'歐洲聯賽',
    /* 這段文案曾經寫「歐洲不會幫你敲 NBA 的門」，但 move:euro 會設 nbaRadar、
       而且 nba.from 就含 euro——實測 606 個登陸 NBA 的人有 148 個是從歐洲過去的。
@@ -649,7 +722,22 @@ const OVERSEAS=[
      （對職業球員說「要先待過…NCAA」，但他已經回不去了）。NCAA 出身走的是選秀那條路。 */
   {lg:'gleague',ovr:78,age:30,from:['bleague','kbl','nbl','euro'],label:'NBA G LEAGUE',
    desc:'層級與薪水都往下掉，但這是離 NBA 最近的一扇門。'},
-  {lg:'nba',    ovr:84,age:32,from:['gleague','euro','nbl'],      label:'NBA'},
+  {lg:'nba',    ovr:84,age:32,from:['gleague','euro','nbl'],      label:'NBA',
+   desc:'不用說明。'},
+];
+
+/* 畢業直接闖海外：跟上面那張表是兩回事。
+   OVERSEAS 是「職業階段人家來找你」，這裡是「你自己買機票去試訓」——
+   沒有職業履歷可以看，所以門檻比人家開報價高幾分，而且沒過就得回台灣補選。
+   門檻與成功率共用同一份，畫面上的粗略帶與實際擲的是同一個數字。
+   歐洲不放在這裡：那是要先在亞洲或澳洲打出東西才談得上的層級，維持它當天花板。 */
+const GRAD_TRYOUTS=[
+  {lg:'bleague',need:74,label:'日本 B.LEAGUE',
+   desc:'跳過國內，直接應徵亞洲外籍名額。門檻高，失敗就只能回台灣補選。'},
+  {lg:'kbl',    need:76,label:'韓國 KBL 亞洲外援',
+   desc:'亞洲外援名額一年只開幾個，搶到就是即戰力待遇。一樣，沒搶到就回台灣補選。'},
+  {lg:'nbl',    need:79,label:'澳洲 NBL 發展合約',
+   desc:'體能對抗是另一個檔次，NBA 球探每年都會來看。應屆生要擠進去，得先過得了那個身體。'},
 ];
 
 const TRAITS={
@@ -1581,18 +1669,26 @@ function draftOdds(g,act){
     const y=clamp(Math.round(g.stageYear),1,4);
     return clamp((nbaScout(g,ovr)-79)/16-(4-y)*0.04,0.03,0.72);
   }
-  if(act==='tryJapan') return clamp((ovr-72)/22,0.1,0.7);
+  /* 畢業直闖海外：三個目的地共用同一條斜率，門檻本身決定難度。
+     門檻當天約一成，門檻 +14 分才會到七成。 */
+  if(act&&act.indexOf('try:')===0){
+    const T=GRAD_TRYOUTS.find(x=>x.lg===act.slice(4));
+    return T?clamp((ovr-(T.need-2))/22,0.1,0.7):null;
+  }
   if(act==='goDraft'||act==='goDraftT1'||act==='earlyDraft')
     return clamp((ovr-46)/16-(g.stage==='hs'?0.35:0),0.03,0.97);
   return null;
 }
+const NCAA_GATE=64, HS_DRAFT_GATE=64, NCAA_IQ_GATE=55;
 function branchHSGrad(g,ovr){
   const opts=[];
-  if(ovr>=64&&g.a.iq>=55){
+  const gN=posGate(g.pos,NCAA_GATE), gD=posGate(g.pos,HS_DRAFT_GATE);
+  const gQ=posAttrGate(g.pos,'iq',NCAA_IQ_GATE);
+  if(ovr>=gN&&g.a.iq>=gQ){
     opts.push({label:'挑戰美國 NCAA',desc:'球探看上你了。語言、體格、上場時間全部歸零重來，但那是通往 NBA 最近的路。',kind:'push',act:'goNCAA'});
   }
-  opts.push({label:'升上 UBA 大專聯賽',desc:'四年養成，球商與身體都能補完，也拿得到文憑。',kind:'norm',act:'goUBA'});
-  if(ovr>=64){
+  opts.push({label:'升上 UBA 大專聯賽',desc:'四年養成，球商與身體都能補完，也拿得到文憑。畢業那年還能直接闖日本、韓國或澳洲。',kind:'norm',act:'goUBA'});
+  if(ovr>=gD){
     opts.push({label:'高中畢業直接投入職籃選秀',desc:'放棄大學，18 歲挑戰 P.LEAGUE+／T1。早四年領薪水，但基本功可能永遠補不回來。',
       kind:'push',act:'goDraft',p:draftOdds(g,'goDraft')});
   }
@@ -1600,7 +1696,8 @@ function branchHSGrad(g,ovr){
     opts.push({label:'先當替代役，一邊打業餘聯賽',desc:'保底路線。多一年準備，隔年再投選秀。',kind:'safe',act:'gap'});
   return {type:'branch',title:'高中畢業',
     text:`HBL 打完了。${g.name}的高中三年結束在這裡，接下來要選一條路。`+
-         (ovr>=64?'（球探報告：綜合 '+ovr+'，有海外球探留下聯絡方式。）':'（球探報告：綜合 '+ovr+'。）'),
+         (ovr>=gN?'（球探報告：綜合 '+ovr+'，有海外球探留下聯絡方式。）':'（球探報告：綜合 '+ovr+'。）')+
+         '\n\n出國不是只有美國那一條——先打國內職籃，日本、韓國、澳洲、歐洲的報價會自己找上門，只是每一層都有門檻。',
     opts:opts};
 }
 function branchDraft(g,ovr,why){
@@ -1615,10 +1712,15 @@ function branchDraft(g,ovr,why){
     kind:'norm',act:'goDraft',p:draftOdds(g,'goDraft')});
   opts.push({label:'投入 T1 聯盟選秀',desc:'競爭略小，上場時間通常更多。',
     kind:'norm',act:'goDraftT1',p:draftOdds(g,'goDraftT1')});
-  if(ovr>=74) opts.push({label:'直接挑戰日本 B.LEAGUE 測試',desc:'跳過國內，直接應徵亞洲外籍名額。門檻高，失敗就只能回台灣補選。',
-    kind:'push',act:'tryJapan',p:draftOdds(g,'tryJapan')});
+  /* 畢業直闖海外：過得了哪一關就開哪一關，門檻越高的排越後面 */
+  const abroad=GRAD_TRYOUTS.filter(T=>ovr>=T.need);
+  for(const T of abroad) opts.push({label:'直接挑戰 '+T.label+' 測試',desc:T.desc,
+    kind:'push',act:'try:'+T.lg,p:draftOdds(g,'try:'+T.lg)});
   return {type:'branch',title:why,
-    text:`${g.name}，${g.age} 歲，綜合 ${ovr}。該決定往哪裡去了。`,opts:opts};
+    text:`${g.name}，${g.age} 歲，綜合 ${ovr}。該決定往哪裡去了。`+
+      (abroad.length>1?`\n\n海外那邊有 ${abroad.length} 扇門開著（${abroad.map(T=>T.label).join('、')}），`
+        +'但每一扇都是一次性的試訓——沒過就得回台灣補選，順位還會掉。':''),
+    opts:opts};
 }
 /* 市場價值：還有沒有球隊願意開合約，由實力扣掉年齡折價與傷病史、再加名氣決定。
    年齡折價是超線性的，所以巔峰球員可以打到 41、42 歲，普通球員 36、37 歲就沒行情——
@@ -1768,25 +1870,34 @@ function teamPool(lg){
 }
 
 /* ---------- 球探報告 ----------
-   只攤開「你正在追的下一道門檻」，不把整張表倒給玩家：
-   有目標才有參與感，但全部攤開就沒有探索的價值了。 */
+   rows＝「你正在追的下一道門檻」，只攤開最近的幾格，有目標才有參與感。
+   map ＝海外路線圖：只給目的地與門檻，不給機率、不給事件。
+   加這張圖是因為使用者回報「我以為出國只有美國」——舊版在高中階段只列得出
+   NCAA 那一列，其他六個目的地要等到打職業才第一次被提到，看起來就像不存在。
+   給地圖不等於把整張表倒出來：你看得到門在哪，但門後面是什麼還是要自己走。 */
 function scoutReport(g){
   const ovr=overall(g),rows=[];
   const req=(lab,need,cur)=>({lab:lab,need:need,cur:r1(cur),gap:r1(Math.max(0,need-cur)),ok:cur>=need});
   if(g.stage==='hs'){
-    rows.push({n:'NCAA 一級 · 高中畢業直接出國',reqs:[req('綜合',64,ovr),req('球商',55,g.a.iq)],
-      note:'兩項同時達標就一定拿得到邀請，不用擲骰。這是唯一一條「一畢業就出國」的路。'});
-    rows.push({n:'職籃選秀 · 高中直投',reqs:[req('綜合',64,ovr)],p:draftOdds(g,'goDraft'),
+    const gN=posGate(g.pos,NCAA_GATE),gD=posGate(g.pos,HS_DRAFT_GATE);
+    rows.push({n:'NCAA 一級 · 高中畢業直接出國',
+      reqs:[req('綜合',gN,ovr),req('球商',posAttrGate(g.pos,'iq',NCAA_IQ_GATE),g.a.iq)],
+      note:'兩項同時達標就一定拿得到邀請，不用擲骰。'+
+        `（門檻照位置補正過：${POS[g.pos].n}的權重分佈跟中鋒不一樣，同一個數字對兩邊的難度差很多。）`});
+    rows.push({n:'職籃選秀 · 高中直投',reqs:[req('綜合',gD,ovr)],p:draftOdds(g,'goDraft'),
       note:'高中直投的中選率會再被扣一截，讀完大學再投比較穩。'});
   }else if(g.stage==='uba'||g.stage==='ncaa'){
     if(g.stage==='ncaa') rows.push({n:'NBA 選秀 · 大一起每年都能宣告',
       reqs:[req('球探評價',NBA_SCOUT_GATE,nbaScout(g,ovr))],p:draftOdds(g,'nbaDraft'),
       note:`球探評價＝現值綜合 ${ovr} 與天花板 ${potOvr(g)} 的加權，年級越低越看天花板。`+
            '越早宣告中選率越低，但落選就失去學生資格、只能從 G League 打起。'});
-    rows.push({n:'日本 B.LEAGUE 測試 · 畢業直接闖',reqs:[req('綜合',74,ovr)],p:draftOdds(g,'tryJapan'),
-      note:'沒過就回台灣補選，等於浪費一次選秀順位。'});
+    for(const T of GRAD_TRYOUTS)
+      rows.push({n:T.label+' 測試 · 畢業直接闖',reqs:[req('綜合',T.need,ovr)],p:draftOdds(g,'try:'+T.lg),
+        note:'沒過就回台灣補選，等於浪費一次選秀順位。'});
     rows.push({n:'國內職籃選秀',reqs:[req('綜合',46,ovr)],p:draftOdds(g,'goDraft'),
       note:'綜合越高順位越前面，而順位會直接影響你第一年在隊上的定位。'});
+    /* 差最少的排前面：畢業直闖有三個目的地，全部攤在最上面會把國內選秀擠掉 */
+    rows.sort((a,b)=>(a.reqs[0]?a.reqs[0].gap:0)-(b.reqs[0]?b.reqs[0].gap:0));
   }else if(g.stage==='pro'){
     const cur=LEAGUES[g.league].tier;
     for(const o of OVERSEAS){
@@ -1805,7 +1916,33 @@ function scoutReport(g){
     if(!rows.length) rows.push({n:'已經站在天花板',reqs:[],
       note:'這個聯盟之上沒有更高的層級了。接下來要追的是冠軍、獎項與生涯紀錄。'});
   }
-  return {ovr:ovr,peer:peerRank(g,ovr),role:g.role,fit:g.fit,rows:rows.slice(0,3)};
+  return {ovr:ovr,peer:peerRank(g,ovr),role:g.role,fit:g.fit,
+          rows:rows.slice(0,4),map:overseasMap(g,ovr)};
+}
+/* 海外路線圖：七個目的地一次看完，狀態分成 待過／現在就談得到／還差幾分／要先待過某層。
+   資料全部來自 OVERSEAS 與 GRAD_TRYOUTS，不另外寫一份，改門檻不會忘記改這裡。 */
+function overseasMap(g,ovr){
+  const been={}; g.seasons.forEach(s=>been[s.lg]=true);
+  const cur=g.stage==='pro'?LEAGUES[g.league].tier:0;
+  const student=g.stage==='hs'||g.stage==='uba'||g.stage==='ncaa';
+  const out=[];
+  if(student) out.push({n:'美國 NCAA 一級',via:'高中畢業就走',
+    need:posGate(g.pos,NCAA_GATE),cur:r1(ovr),
+    state:been.NCAA?'been':g.stage!=='hs'?'closed'
+      :ovr>=posGate(g.pos,NCAA_GATE)&&g.a.iq>=posAttrGate(g.pos,'iq',NCAA_IQ_GATE)?'open':'short'});
+  for(const o of OVERSEAS){
+    const T=student?GRAD_TRYOUTS.find(x=>x.lg===o.lg):null;
+    const need=T?T.need:o.ovr;
+    let state;
+    if(been[LEAGUES[o.lg].short]) state='been';
+    else if(student) state=T?(ovr>=need?'open':'short'):'later';
+    else if(LEAGUES[o.lg].tier<=cur) state='closed';
+    else if(o.from.indexOf(g.league)<0||g.age>o.age||(o.lg==='nba'&&!g.flags.nbaRadar)) state='locked';
+    else state=ovr>=need?'open':'short';
+    out.push({n:LEAGUES[o.lg].n,via:T?'大學畢業直接闖':'職業階段的報價',
+      need:need,cur:r1(ovr),state:state});
+  }
+  return out;
 }
 
 /* ---------- 執行分岔選擇 ---------- */
@@ -1876,15 +2013,24 @@ function applyBranch(g,idx){
         +fitLine();
       g.fame=clamp(g.fame+(pickNo<=3?18:pickNo<=8?10:4),0,100);
     }
-  }else if(act==='tryJapan'){
-    const ok=rng()<draftOdds(g,'tryJapan');
+  }else if(act&&act.indexOf('try:')===0){
+    const lg=act.slice(4);
+    const T=GRAD_TRYOUTS.find(x=>x.lg===lg)||GRAD_TRYOUTS[0];
+    const ok=rng()<draftOdds(g,'try:'+lg);   /* 與畫面上顯示的粗略帶同一個來源 */
     if(ok){
-      g.stage='pro'; g.stageYear=0; move('bleague');
-      card.body=`測試賽通過。${g.team} 簽下你，亞洲外籍名額。日文一句都不會，但籃球是共通語言。`+fitLine();
+      g.stage='pro'; g.stageYear=0; move(lg);
+      const ARRIVE={
+        bleague:`測試賽通過。${g.team} 簽下你，亞洲外籍名額。日文一句都不會，但籃球是共通語言。`,
+        kbl    :`亞洲外援名額給了你。${g.team} 的翻譯在機場舉著寫錯一個字的名牌，你還是笑著走過去。`,
+        nbl    :`發展合約簽下去了。${g.team} 的訓練第一天你就知道，這裡的身體是另一個檔次。`,
+      };
+      card.body=(ARRIVE[lg]||`測試賽通過，${g.team} 簽下你。`)+fitLine();
       g.fame=clamp(g.fame+16,0,100); card.hl=true;
+      /* 跟 move: 用同一條規則：澳洲會進 NBA 球探的名單，亞洲聯賽不會 */
+      if(lg==='nbl') g.flags.nbaRadar=true;
     }else{
       g.stage='pro'; g.stageYear=0; move('plg');
-      card.body='測試賽最後一天被刷掉。回台灣參加補選，落腳 '+g.team+'。'+fitLine();
+      card.body=`${T.label}的測試賽最後一天被刷掉。回台灣參加補選，落腳 ${g.team}。`+fitLine();
       g.a.mind=clamp(g.a.mind-3,0,99);
     }
   }else if(act&&act.indexOf('move:')===0){
@@ -2433,8 +2579,15 @@ function render(){
   if(!G){ renderStart(); return; }
   if(G.phase==='end'){ renderEnd(); return; }
   app.innerHTML=board()+`<div class="log" id="log">${G.log.slice(-7).map(cardHTML).join('')}</div>`+dock();
-  wireBoard(); wireDock();
+  wireBoard(); wireDock(); fitDock();
 }
+/* 動作面板高過視窗就不能黏在底部（見 .dock.tall 的說明）。
+   留 40px 餘裕，免得剛好等高時一直在兩種狀態之間跳。 */
+function fitDock(){
+  const d=document.querySelector('.dock');
+  if(d) d.classList.toggle('tall',d.getBoundingClientRect().height>window.innerHeight-40);
+}
+window.addEventListener('resize',fitDock);
 function wireBoard(){
   const b=document.querySelector('.board'); if(!b) return;
   b.addEventListener('click',e=>{
@@ -2530,7 +2683,32 @@ function scoutPanel(){
         <p class="gn">${esc(r.note)}</p>
       </div>`;}).join('')}
     <p class="phint">只列出你正在追的下一段，走到了自然會看到再下一段。</p>
+    ${mapHTML(S.map)}
   </div>`;
+}
+const MAP_STATE={
+  been  :{n:'待過',      k:'been'},
+  open  :{n:'現在就談得到',k:'open'},
+  short :{n:'還差',      k:'short'},
+  locked:{n:'路線未開',  k:'locked'},
+  closed:{n:'已經越過',  k:'locked'},
+  later :{n:'打職業之後',k:'later'},
+};
+function mapHTML(map){
+  if(!map||!map.length) return '';
+  return `<h5 class="sch">海外路線圖</h5>
+  <div class="omap">${map.map(m=>{
+    const S=MAP_STATE[m.state]||MAP_STATE.later;
+    const gap=m.need!=null?r1(Math.max(0,m.need-m.cur)):null;
+    return `<div class="orow ${S.k}">
+      <span class="on">${esc(m.n)}</span>
+      <span class="ov">${m.need!=null?`綜合 ${m.need}`:'—'}</span>
+      <span class="os">${m.state==='short'?`還差 ${gap}`:esc(S.n)}</span>
+      <span class="od">${esc(m.via)}</span>
+    </div>`;}).join('')}</div>
+  <p class="phint">出國有兩條走法：<b>畢業直接闖</b>（自己去試訓，沒過就回台灣補選），
+    或<b>先打國內職業再等報價</b>（人家來找你，但每一層都要先待過下一層才談得上）。
+    美國只是其中一扇門。</p>`;
 }
 
 function attrName(k){ return (ATTRS.find(a=>a.k===k)||{}).n||k; }
@@ -2558,7 +2736,7 @@ function attrRow(at,o){
 function deltaHTML(ds){
   if(!ds||!ds.length) return '';
   return `<div class="delta">${ds.map(d=>
-    `<span class="chip ${d.v>0?'up':d.v<0?'down':''}">${attrName(d.k)} ${d.v>=0?'+':''}${d.v}${
+    `<span class="chip ${d.v>0?'up':d.v<0?'down':''}${d.capped?' long':''}">${attrName(d.k)} ${d.v>=0?'+':''}${d.v}${
       d.capped?`<i class="capnote">／天賦上限只吃得下這些（原本 +${d.capped}）</i>`:''
     }</span>`).join('')}</div>`;
 }
@@ -2610,9 +2788,9 @@ function cardHTML(c){
       `<span class="chip mile">🏅 ${esc(m.n)}</span>`).join('')}</div>`;
   inner+=deltaHTML(c.deltas);
   if(c.decline&&c.decline.length)
-    inner+=`<div class="delta"><span class="chip down" style="opacity:.85">歲月：${c.decline.map(d=>attrName(d.k)+' '+d.v).join('、')}</span></div>`;
+    inner+=`<div class="delta"><span class="chip down long" style="opacity:.85">歲月：${c.decline.map(d=>attrName(d.k)+' '+d.v).join('、')}</span></div>`;
   if(c.injury)
-    inner+=`<div class="delta"><span class="chip down">${c.injury.severe?'重傷':'傷勢'} — ${esc(c.injury.text)}</span></div>`;
+    inner+=`<div class="delta"><span class="chip down long">${c.injury.severe?'重傷':'傷勢'} — ${esc(c.injury.text)}</span></div>`;
   if(c.newTraits&&c.newTraits.length)
     inner+=`<div class="delta">${c.newTraits.map(t=>
       `<span class="chip trait">獲得特質 · ${esc(TRAITS[t].n)}</span>`).join('')}</div>`;
@@ -2824,10 +3002,33 @@ function autoAlloc(){
   }
 }
 function resetAlloc(){ ALLOC={}; }
+/* 捲到「動作面板的頂端」，而不是頁面最底。
+   季初加練的面板有 1100px 以上（骰子 → 訓練強度 → 球季態度 → 風險 → 九項分配 → 按鈕），
+   比任何手機視窗都高。捲到最底會把最上面的加練骰子與訓練強度推出畫面外——
+   實測 690px 視窗下骰子在畫面上方 415px 處，玩家看到的是「骰子不見了」。
+   面板本來就比視窗矮的時候（結算、事件、抉擇）clamp 回頁尾，行為跟以前一樣。 */
 function scrollLog(){
   requestAnimationFrame(()=>{
     const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    window.scrollTo({top:document.body.scrollHeight,behavior:reduce?'auto':'smooth'});
+    const maxTop=Math.max(0,document.body.scrollHeight-window.innerHeight);
+    const dock=document.querySelector('.dock');
+    let top=maxTop;
+    if(dock){
+      const board=document.querySelector('.board');
+      const head=board?board.getBoundingClientRect().height:0;   /* 記分板是 sticky，會蓋住上緣 */
+      /* 動作面板自己是 sticky(bottom:0)，它的 rect 是「被黏住之後」的位置，不能拿來算。
+         改用它上面那塊敘事卡（.log，永遠是靜態的）的下緣＋面板的 margin-top，
+         算出來的才是面板在版面上的真實位置。
+         （試過臨時把 position 改成 static 再量：會觸發 Chrome 的 scroll anchoring，
+           量到一半整頁被拉走，誤差剛好一個視窗高度。） */
+      const log=document.getElementById('log');
+      const mt=parseFloat(getComputedStyle(dock).marginTop)||0;
+      const dockTop=log
+        ? log.getBoundingClientRect().bottom+window.pageYOffset+mt
+        : dock.getBoundingClientRect().top+window.pageYOffset;
+      top=Math.min(maxTop,Math.max(0,dockTop-head-8));
+    }
+    window.scrollTo({top:top,behavior:reduce?'auto':'smooth'});
   });
 }
 

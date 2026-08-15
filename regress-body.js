@@ -486,5 +486,94 @@ console.log('\n【⑦H】大一到大四都投得了 NBA 選秀，且早走的�
   say(g2.stage==='pro'&&g2.league==='gleague','落選就是 G League，不會退回 NCAA 再讀一年');
 }
 
+/* ============ ⑧ 使用者回報：「出國好像只有美國」 ============ */
+console.log('\n【⑧A】球探報告的海外路線圖：七個目的地都在，門檻不可以另外寫一份');
+{
+  const g=createGame('mapx','測','SF');
+  const map=scoutReport(g).map;
+  const want=['NCAA','日本','韓國','澳洲','歐洲','G LEAGUE','NBA'];
+  say(map.length===OVERSEAS.length+1,
+    `路線圖有 ${map.length} 個目的地（OVERSEAS ${OVERSEAS.length} 個＋高中的 NCAA）`);
+  const missing=want.filter(w=>!map.some(m=>m.n.indexOf(w)>=0));
+  say(missing.length===0,`七個目的地都列得出來（缺 ${missing.join('/')||'無'}）`);
+  /* 門檻必須直接讀常數表，不可以在 UI 那邊另外抄一份——抄了就會有一天對不上 */
+  let wrong=0;
+  for(const T of GRAD_TRYOUTS){
+    const row=map.find(m=>m.n===LEAGUES[T.lg].n);
+    if(!row||row.need!==T.need) wrong++;
+  }
+  say(wrong===0,`學生階段列的是 GRAD_TRYOUTS 的門檻（對不上 ${wrong} 個）`);
+  const pro=createGame('mapy','測','SF');
+  pro.stage='pro'; pro.league='plg'; pro.age=24;
+  const pmap=scoutReport(pro).map;
+  let wrong2=0;
+  for(const o of OVERSEAS){
+    const row=pmap.find(m=>m.n===LEAGUES[o.lg].n);
+    if(!row||row.need!==o.ovr) wrong2++;
+  }
+  say(wrong2===0,`職業階段列的是 OVERSEAS 的門檻（對不上 ${wrong2} 個）`);
+}
+
+console.log('\n【⑧B】韓國 KBL 不可以是死內容');
+{
+  /* 舊版門檻 76：KBL 與 B1 同層級，而 76 比日本的 72 高四分，
+     所有人都先拿日本的報價走掉，走掉之後同層級就被 tier 濾掉，KBL 再也不會出現。
+     實測 1000 局只有 5 局踏進過 KBL。 */
+  let kbl=0,jp=0;
+  for(let i=0;i<300;i++){
+    const g=autoPlay('k'+i,'D'+(i%5),{pos:Object.keys(POS)[i%5]});
+    const lgs=new Set(g.seasons.map(s=>s.lg));
+    if(lgs.has('KBL')) kbl++;
+    if(lgs.has('B1')) jp++;
+  }
+  console.log(`    300 局：踏進日本 ${jp} 局、踏進韓國 ${kbl} 局`);
+  /* 門檻 73 → 106/300；把門檻改回舊的 76 只剩 27/300（這個決策序列比較常賴在 PLG，
+     所以看起來沒有全域量測的 5/1000 那麼慘，但差距一樣是三、四倍）。界線放 60。 */
+  say(kbl>=60,`韓國 KBL 走得到（${kbl}/300 局，門檻改回 76 會掉到 27/300）`);
+  /* 兩張報價要能同時出現，不然「選一邊」這件事根本不存在 */
+  const b1=OVERSEAS.find(o=>o.lg==='bleague'),kb=OVERSEAS.find(o=>o.lg==='kbl');
+  say(Math.abs(kb.ovr-b1.ovr)<=2&&LEAGUES[kb.lg].tier===LEAGUES[b1.lg].tier,
+    `日本 ${b1.ovr} 與韓國 ${kb.ovr} 的門檻夠近，同一年拿得到兩張報價`);
+}
+
+console.log('\n【⑧C】高中門檻的位置補正：小前鋒不可以永遠出不了國');
+{
+  /* 綜合是加權平均而訓練是遞減報酬，權重集中的位置可以把點數整包倒進高權重項。
+     用同一個數字當門檻，實測 NCAA 達標率是中鋒 26%、小前鋒 1%。 */
+  const rate={};
+  for(const pos of Object.keys(POS)){
+    let n=0,ok=0;
+    for(let i=0;i<160;i++){
+      const g=createGame('n'+pos+i,'測',pos);
+      let guard=0;
+      while(g.phase!=='end'&&guard++<200){
+        const p=g.pending; if(!p) break;
+        if(p.type==='train'){
+          const pts=trainPoints(g,'push'),alloc={},w=POS[pos].w;
+          for(let j=0;j<pts;j++){ let b=null,bs=-1;
+            for(const at of ATTRS){ if(g.a[at.k]>=g.pot[at.k])continue;
+              const s=(w[at.k]||0.01)*gainFor(g,at.k,alloc[at.k]||0); if(s>bs){bs=s;b=at.k;} }
+            if(!b)break; alloc[b]=(alloc[b]||0)+1; }
+          applyTrain(g,'push',alloc,'allin');
+        }
+        else if(p.type==='event') applyEvent(g,0);
+        else if(p.type==='result') advance(g);
+        else if(p.type==='branch'){
+          if(p.title==='高中畢業'){ n++; if(p.opts.some(o=>o.act==='goNCAA')) ok++; break; }
+          applyBranch(g,0);
+        } else break;
+      }
+    }
+    rate[pos]=ok/n;
+  }
+  const vals=Object.values(rate);
+  const lo=Math.min(...vals),hi=Math.max(...vals);
+  console.log('    NCAA 達標率：'+Object.keys(rate).map(k=>`${k} ${(rate[k]*100).toFixed(1)}%`).join('　'));
+  /* 把門檻改回固定的 64／55，小前鋒會掉到 0.6%、最高最低差 38 倍。界線放 1.5% 與 8 倍。 */
+  say(lo>0.015,`每個位置都拿得到 NCAA 邀請（最低 ${(lo*100).toFixed(1)}%，固定門檻時小前鋒只有 0.6%）`);
+  say(hi/Math.max(lo,1e-9)<8,
+    `五個位置的達標率沒有差到一個數量級（最高 ${(hi*100).toFixed(1)}% ÷ 最低 ${(lo*100).toFixed(1)}% = ${(hi/Math.max(lo,1e-9)).toFixed(1)} 倍，舊版 26 倍）`);
+}
+
 console.log('\n'+(fail?`✗ ${fail} 項未通過`:'✓ 回歸測試全部通過'));
 process.exit(fail?1:0);
