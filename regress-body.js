@@ -23,9 +23,14 @@ function autoPlay(seed,dseed,opt){
     else if(p.type==='event') applyEvent(g,Math.floor(drng()*p.opts.length));
     else if(p.type==='result') advance(g);
     else if(p.type==='branch'){
-      /* 只要還能打就繼續打，才驗得到「被市場踢掉」這件事 */
+      /* 預設：只要還能打就繼續打，才驗得到「被市場踢掉」這件事。
+         branchMode 是給生涯指數校準用的——那張 PR 表是三種策略混出來的參考分佈
+         （first 一路衝／stay 留在原地／last 一路保守），要驗表就得跑同一組策略，
+         定義必須跟 calib-body.js 一模一樣。 */
       let i=0;
-      p.opts.forEach((o,k)=>{ if(o.act==='stay'||(o.act||'').indexOf('move:')===0) i=k; });
+      const bm=opt.branchMode||'stay';
+      if(bm==='last') i=p.opts.length-1;
+      else if(bm==='stay') p.opts.forEach((o,k)=>{ if(o.act==='stay'||(o.act||'').indexOf('move:')===0) i=k; });
       /* 中華隊：opt.natl 決定去不去，用來驗國際賽曝光有沒有真的影響出國 */
       if(opt.natl!==undefined&&p.opts.some(o=>(o.act||'').indexOf('natl:')===0)){
         i=opt.natl?0:p.opts.findIndex(o=>o.act==='skipNatl');
@@ -573,6 +578,435 @@ console.log('\n【⑧C】高中門檻的位置補正：小前鋒不可以永遠�
   say(lo>0.015,`每個位置都拿得到 NCAA 邀請（最低 ${(lo*100).toFixed(1)}%，固定門檻時小前鋒只有 0.6%）`);
   say(hi/Math.max(lo,1e-9)<8,
     `五個位置的達標率沒有差到一個數量級（最高 ${(hi*100).toFixed(1)}% ÷ 最低 ${(lo*100).toFixed(1)}% = ${(hi/Math.max(lo,1e-9)).toFixed(1)} 倍，舊版 26 倍）`);
+}
+
+/* ============ ⑨A 名人堂不可以用年資買到 ============ */
+/* v1.2.0 的實測：22% 的生涯進名人堂、13.6% 拿 S，其中三分之二的入選者職業場均不到 15 分。
+   原因是被動項自己就湊得出 75 分（最高綜合 27.6＋NBA 年資 18＋最高殿堂 16＋名氣 7
+   ＋里程碑 4＋當家年資 3），一座獎盃都不用拿就過了 70 的門檻。 */
+console.log('\n【⑨A】待得夠久＋綜合夠高，可不可以零獎項進名人堂');
+{
+  /* 手工組一個「NBA 打滿 20 季、綜合 95、名氣爆表、產出平庸、一座獎都沒有」的人 */
+  const season=(lg,pts,reb,ast)=>({lg:lg,stage:'職業第 1 年',gp:40,pts:pts,reb:reb,ast:ast,
+    stl:0.6,blk:0.5,hi:20,awards:[],champ:false,miss:false});
+  const mk=o=>Object.assign({seasons:[],awards:[],traits:[],natl:[],milestones:[],
+    bestOvr:95,fame:100,starYears:20,champs:0},o);
+  const grinder=mk({seasons:Array.from({length:20},()=>season('NBA',11,4,2))});
+  const h1=hofScore(grinder);
+  console.log(`    NBA 20 季、綜合 95、名氣 100、零獎項、場均 11 分 → 名人堂票數 ${h1}`);
+  say(h1<70,`零獎項的年資怪進不了名人堂（${h1}／100，門檻 70；舊制同一份履歷是 74，直接入選）`);
+  say(grade(h1,grinder).g!=='S'&&grade(h1,grinder).g!=='A',
+    `他的評價是 ${grade(h1,grinder).g}，不是 S 也不是 A`);
+  /* 同一個人加上真正的戰功，就該進得去——門檻不可以只是變成「誰都進不去」 */
+  const legend=mk({seasons:Array.from({length:20},()=>season('NBA',24,8,5)),
+    awards:[].concat(
+      Array.from({length:3},()=>({y:0,t:'NBA 總冠軍',lg:'NBA'})),
+      Array.from({length:2},()=>({y:0,t:'NBA 年度 MVP',lg:'NBA'})),
+      Array.from({length:6},()=>({y:0,t:'年度第一隊',lg:'NBA'})))});
+  const h2=hofScore(legend);
+  console.log(`    同樣 20 季，但場均 24 分＋3 冠 2 MVP 6 次第一隊 → 名人堂票數 ${h2}`);
+  say(h2>=70,`真的打出東西的人進得去（${h2}／100）`);
+}
+
+/* ============ ⑨B 同一座獎，在不同聯盟不是同一件事 ============ */
+console.log('\n【⑨B】PLG 的 MVP 與 NBA 的 MVP，票數不可以一樣重');
+{
+  const mvp=lg=>({seasons:[],awards:[{y:0,t:lg+' 年度 MVP',lg:lg}],traits:[],natl:[],
+    milestones:[],bestOvr:0,fame:0,starYears:0,champs:0});
+  const nba=hofScore(mvp('NBA')),plg=hofScore(mvp('PLG')),b1=hofScore(mvp('B1'));
+  console.log(`    一座 MVP 值多少票：NBA ${nba}　B1 ${b1}　PLG ${plg}`);
+  say(nba>b1&&b1>plg,'聯盟層級越高，同一座獎越重');
+  say(plg*2<nba,`PLG 的 MVP 不到 NBA 的一半（${plg} vs ${nba}）`);
+  say(Math.abs(lgWeight('NBA')-1)<1e-9,'NBA 的份量是 1（基準沒有偏移）');
+}
+
+/* ============ ⑨C 獎項要跟當季數據掛鉤 ============ */
+/* 舊版 MVP 只看綜合與定位，實測會發出「場均 10.3 分的年度 MVP」，
+   而那幾座 MVP 又回頭把他送進名人堂。 */
+console.log('\n【⑨C】會不會發出場均十幾分的年度 MVP');
+{
+  let mvps=0,worst=null,lowMvp=0,first=0,lowFirst=0;
+  for(let i=0;i<400;i++){
+    const g=autoPlay('w'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5]});
+    for(const s of g.seasons){
+      const cv=s.pts+s.reb*0.85+s.ast*1.05+((s.stl||0)+(s.blk||0))*1.6;
+      if(s.awards.some(a=>a.indexOf('年度 MVP')>=0)){
+        mvps++; if(cv<26){ lowMvp++; if(!worst||cv<worst.cv) worst={cv:cv,pts:s.pts,lg:s.lg}; }
+      }
+      if(s.awards.indexOf('年度第一隊')>=0){ first++; if(cv<18) lowFirst++; }
+    }
+  }
+  console.log(`    400 局發出 ${mvps} 座年度 MVP、${first} 次年度第一隊`);
+  say(lowMvp===0,`沒有任何一座 MVP 是在貢獻值不到 26 的球季拿到的（違規 ${lowMvp} 座`
+    +(worst?`，最低 ${worst.cv.toFixed(1)}／場均 ${worst.pts} ${worst.lg}`:'')+'）');
+  say(lowFirst===0,`沒有任何一次年度第一隊是在貢獻值不到 18 的球季拿到的（違規 ${lowFirst} 次）`);
+}
+
+/* ============ ⑨D 里程碑只能算職業球季 ============ */
+console.log('\n【⑨D】高中大學的數字不可以拿去解鎖職業里程碑');
+{
+  /* 三年高中＋四年大學，每季 30 場、場均 30 分 12 板 9 助、單場最高 55——
+     累計 6,300 分。舊版（讀 g.career）會直接送出 1,000 分、5,000 分、單場 40、單場 50、
+     準大三元、單季 25 分共 6 個里程碑，而且這些里程碑還會回頭加名人堂票數。 */
+  const amaS=(st,lg)=>({lg:lg,stage:st,gp:30,pts:30,reb:12,ast:9,stl:2,blk:1,hi:55,awards:[],miss:false});
+  const hs={seasons:['高一','高二','高三'].map(x=>amaS(x,'HBL'))
+    .concat(['大一','大二','大三','大四'].map(x=>amaS(x,'UBA'))),milestones:[],streakFull:0};
+  const got=MILESTONES.filter(m=>m.f(hs,proStats(hs))).map(m=>m.n);
+  console.log(`    高中大學共 7 季、累計 ${30*30*7} 分、單場 55 → 解鎖 ${got.length?got.join('、'):'（無）'}`);
+  say(got.length===0,'學生時期不會解鎖任何職業里程碑（舊版會直接送出 6 個）');
+  const pro={seasons:hs.seasons.concat([{lg:'PLG',stage:'職業第 1 年',gp:40,pts:30,reb:12,ast:9,
+    stl:2,blk:1,hi:55,awards:[],miss:false}]),milestones:[],streakFull:0};
+  const got2=MILESTONES.filter(m=>m.f(pro,proStats(pro))).map(m=>m.n);
+  say(got2.length>=3,`同一份數據換成職業球季就解得開（${got2.length} 個：${got2.join('、')}）`);
+  say(got2.indexOf('職業 5,000 分')<0,'而且只認職業的那 1,200 分，學生時期的 6,300 分不會被算進去');
+}
+
+/* ============ ⑨E 生涯指數 ============ */
+console.log('\n【⑨E】生涯指數：上限、單調、以及 PR 表是不是實測出來的');
+{
+  const cap=Object.values(CI_CAP).reduce((s,v)=>s+v,0);
+  say(cap===20000,`七個項目的上限加起來剛好 20,000（實際 ${cap}）`);
+  /* 只加總常數是抓不到「某一項自己超過上限」的——CI_K 乘在 clamp 外面的時候，
+     年資項會算出 1,544/1,500、長條寬度 103%，但上面那條守門照樣綠。 */
+  {
+    let over=null,n=0;
+    for(let i=0;i<300;i++){
+      const g=autoPlay('cap'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5],
+        branchMode:['first','stay','last'][i%3]});
+      const P=g.summary.ciParts;
+      for(const k in CI_CAP){ n++; if(P[k]>CI_CAP[k]&&!over) over={k:k,v:P[k],cap:CI_CAP[k],sd:'cap'+i}; }
+    }
+    say(!over,over?`第 ${over.k} 項算出 ${over.v} > 上限 ${over.cap}（${over.sd}）`
+      :`檢查 ${n} 個項目值，沒有任何一項超過自己的上限`);
+  }
+  const rows=[];
+  for(let i=0;i<600;i++){
+    const g=autoPlay('c'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5],
+      branchMode:['first','stay','last'][i%3]});
+    rows.push({ci:g.summary.ci,hof:g.summary.hof,pr:g.summary.ciPr});
+  }
+  say(rows.every(r=>r.ci>=0&&r.ci<=20000),'沒有任何一局超出 0～20,000');
+  /* 名人堂等級的人，指數一定比沒進職業的人高——兩把尺不可以互相打架 */
+  const hi=rows.filter(r=>r.hof>=70),lo=rows.filter(r=>r.hof<20);
+  if(hi.length&&lo.length){
+    const avg=a=>a.reduce((s,x)=>s+x.ci,0)/a.length;
+    console.log(`    名人堂級平均 ${avg(hi).toFixed(0)}　輪替以下平均 ${avg(lo).toFixed(0)}`);
+    say(avg(hi)>avg(lo)*1.6,'名人堂級的生涯指數明顯高於進不了職業殿堂的（≥1.6 倍）');
+  }
+  /* PR 表：引擎裡寫死的表必須跟實際跑出來的分佈對得起來（容差 4%） */
+  const s=rows.map(r=>r.ci).sort((a,b)=>a-b);
+  const p80=s[Math.floor(s.length*0.8)];
+  const err=Math.abs(p80-10000)/10000;
+  console.log(`    600 局實測 P80 = ${p80}（引擎宣稱 10,000，誤差 ${(err*100).toFixed(1)}%）`);
+  say(err<0.08,`實測 P80 與宣稱的 10,000 對得起來（誤差 ${(err*100).toFixed(1)}%，容差 8%）`);
+  /* 校準係數對了、但 PR 表忘記重跑，也要抓得出來 */
+  const tblErr=Math.abs(CI_PCTL[16]-p80)/p80;
+  say(tblErr<0.08,`PR 表沒有過期（表上 P80 ${CI_PCTL[16]}，實測 ${p80}，差 ${(tblErr*100).toFixed(1)}%；`
+    +'過期的話跑 npm run calib 重貼）');
+  say(Math.abs(ciRank(CI_PCTL[16])-80)<=1,`PR 表第 16 格就是 PR 80（${CI_PCTL[16]} → PR ${ciRank(CI_PCTL[16])}）`);
+  say(ciRank(0)===0&&ciRank(99999)===99,'PR 兩端夾得住（0 分 → PR 0，滿分 → PR 99）');
+}
+
+/* ============ ⑨F 薪資 ============ */
+console.log('\n【⑨F】薪資：超級巨星要拉得開，G League 要真的是犧牲');
+{
+  const mk=(lg,fame)=>({league:lg,fame:fame||50,traits:[],stage:'pro',age:26,injuries:0,
+    a:{},pos:'SF',money:0});
+  /* isMinDeal 會去算 overall(g)，這裡直接餵一個不會被判底薪的假人 */
+  const pay=(lg,ovr,role)=>{
+    const g=mk(lg); g.a={shoot:ovr,three:ovr,handle:ovr,pass:ovr,reb:ovr,def:ovr,ath:ovr,iq:ovr,mind:ovr};
+    return payFor(g,ovr,role);
+  };
+  const nbaStar=pay('nba',96,'star'),nbaMid=pay('nba',84,'starter'),nbaBench=pay('nba',80,'bench');
+  console.log(`    NBA 年薪：綜合 96 當家 ${nbaStar.toLocaleString()}　綜合 84 先發 ${nbaMid.toLocaleString()}　綜合 80 板凳 ${nbaBench.toLocaleString()} 萬`);
+  say(nbaStar/nbaMid>=4,`超級巨星的年薪是中段先發的 ${(nbaStar/nbaMid).toFixed(1)} 倍（要 ≥4 倍，舊制只有 2.1 倍）`);
+  say(nbaStar>nbaMid&&nbaMid>nbaBench,'薪水隨綜合與定位單調遞增');
+  const glg=pay('gleague',80,'starter'),plg=pay('plg',80,'starter');
+  console.log(`    同樣綜合 80 的先發：G League ${glg.toLocaleString()}　PLG ${plg.toLocaleString()} 萬`);
+  say(glg<plg,`去 G League 是拿香蕉領薪水（${glg} < ${plg}），這條路的代價是真的`);
+  /* 頂薪只有頂級聯盟開得出來 */
+  const plgStar=pay('plg',96,'star'),plgMid=pay('plg',84,'starter');
+  say(plgStar/plgMid<2.2,`國內聯盟沒有頂薪合約（${(plgStar/plgMid).toFixed(1)} 倍，NBA 是 ${(nbaStar/nbaMid).toFixed(1)} 倍）`);
+}
+
+/* ============ ⑩A 退休年齡要像真的 ============ */
+/* v1.3.0 之前：合約門檻是一條全域底線 52，綜合 70 的 39 歲老將在 NBA 照樣年年續約，
+   於是退休年齡 p10/p50/p90 = 35/38/42，33.7% 打到 40 歲以上、26.5% 打滿到 42 歲的硬上限，
+   而且在 NBA 打過的人，最後一季的年齡中位數是 42 歲。 */
+console.log('\n【⑩A】退休年齡：極少人能超過 40 歲');
+{
+  const ages=[],nbaEnd=[],lens=[];
+  for(let i=0;i<600;i++){
+    const g=autoPlay('age'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5],
+      branchMode:['first','stay','last'][i%3]});
+    const proS=g.seasons.filter(isProSeason);
+    if(!proS.length) continue;
+    ages.push(g.age); lens.push(proS.length);
+    const nb=proS.filter(s=>s.lg==='NBA');
+    if(nb.length) nbaEnd.push(nb[nb.length-1].age);
+  }
+  const q=(a,p)=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length*p)];};
+  const over40=ages.filter(a=>a>=40).length/ages.length;
+  console.log(`    ${ages.length} 段職業生涯：退休年齡 p10/p50/p90 = ${q(ages,.1)}/${q(ages,.5)}/${q(ages,.9)}`
+    +`　職業季數中位 ${q(lens,.5)}`);
+  say(q(ages,.5)>=33&&q(ages,.5)<=37,`退休年齡中位數 ${q(ages,.5)} 歲（要 33～37）`);
+  say(over40<0.08,`打到 40 歲以上的只有 ${(over40*100).toFixed(1)}%（要 <8%，舊制是 33.7%）`);
+  say(q(ages,.9)<=40,`p90 是 ${q(ages,.9)} 歲（要 ≤40，舊制是 42 的硬上限）`);
+  if(nbaEnd.length>=20)
+    say(q(nbaEnd,.5)<=36,`NBA 最後一季的年齡中位數 ${q(nbaEnd,.5)} 歲（要 ≤36，n=${nbaEnd.length}）`);
+}
+
+/* ============ ⑩B 掉出聯盟要有下一階可以去 ============ */
+console.log('\n【⑩B】素質掉下來之後，是被降級還是直接被判死');
+{
+  let drops=0,games=0,withDrop=0,endLg={},up=0;
+  for(let i=0;i<400;i++){
+    const g=autoPlay('dn'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5]});
+    const proS=g.seasons.filter(isProSeason);
+    if(!proS.length) continue;
+    games++; let d=0;
+    for(let k=1;k<proS.length;k++){
+      const a=lgKey(proS[k].lg),b=lgKey(proS[k-1].lg);
+      if(!a||!b) continue;
+      if(LEAGUES[a].tier<LEAGUES[b].tier) d++;
+      if(LEAGUES[a].tier>LEAGUES[b].tier) up++;
+    }
+    drops+=d; if(d) withDrop++;
+    endLg[proS[proS.length-1].lg]=(endLg[proS[proS.length-1].lg]||0)+1;
+  }
+  console.log(`    ${games} 段生涯：往下掉 ${drops} 次（${(withDrop/games*100).toFixed(0)}% 的人至少被降級一次）、往上爬 ${up} 次`);
+  console.log('    生涯最後一季在哪：'+Object.entries(endLg).sort((a,b)=>b[1]-a[1])
+    .map(([k,v])=>`${k} ${(v/games*100).toFixed(0)}%`).join('　'));
+  say(withDrop/games>0.15,`降級是常態不是特例（${(withDrop/games*100).toFixed(0)}% 至少降過一次，舊制 0%——舊制根本沒有降級這條路）`);
+  say(up>0,'往上爬的路還在（降級沒有把旅外報價擋掉）');
+}
+
+/* ============ ⑩C 還是聯盟最強的人，不可以被市場判死 ============ */
+console.log('\n【⑩C】合約門檻不可以反過來咬還打得動的人');
+{
+  const mk=(lg,ovr,age,fame,aw)=>({league:lg,age:age,fame:fame,injuries:0,traits:[],stage:'pro',
+    seasons:[{lg:LEAGUES[lg].short,stage:'職業第 1 年',gp:40,pts:20,reb:6,ast:3,stl:1,blk:1,
+              hi:35,awards:aw||[],miss:false}]});
+  /* 39 歲、綜合 77、剛拿完總冠軍賽 MVP 的 PLG 球員 */
+  const vet=mk('plg',77,39,60,['PLG 總冠軍','總冠軍賽 MVP']);
+  say(hasDeal(vet,77,'plg'),'39 歲拿完 FMVP 的 PLG 球員，隔年一定有約（拿大獎的隔年不會被裁）');
+  /* 沒有大獎、年齡折價也已經把行情吃到門檻以下，但他還是全聯盟最強的那幾個人之一。
+     這一條要卡在「豁免線之上、市場行情之下」，不然守的其實是市場那條路。 */
+  const star=mk('plg',85,41,60);
+  console.log(`    41 歲綜合 85 的 PLG 球員：行情 ${marketValue(star,85,'plg').toFixed(1)}`
+    +`（門檻 ${lgFloor('plg').toFixed(1)}）、豁免線 ${starExempt('plg',41).toFixed(1)}`);
+  say(marketValue(star,85,'plg')<lgFloor('plg'),'（前提）他的行情確實已經掉到門檻以下了');
+  say(hasDeal(star,85,'plg'),'但他還是有約——全聯盟前幾名不會因為年紀被放掉');
+  /* 掉到水準線以下的老將：NBA 沒約，但下面收得到 */
+  const fade=mk('nba',70,34,40);
+  say(!hasDeal(fade,70,'nba'),'34 歲、綜合 70 在 NBA 沒有約了（NBA 的板凳末端也有 NBA 的水準）');
+  say(landingSpots(fade,70).length>0,`但下面還有 ${landingSpots(fade,70).length} 個聯盟收得下他（${landingSpots(fade,70).map(k=>LEAGUES[k].short).join('、')}）`);
+  /* 年輕的爛咖：誰都不要 */
+  const bust=mk('t1',40,26,5);
+  say(!hasDeal(bust,40,'t1')&&landingSpots(bust,40).length===0,'綜合 40 的人是真的沒人要（強制退休還在）');
+  /* 豁免線要隨年齡上升 */
+  say(starExempt('plg',40)>starExempt('plg',33),
+    `「先發等級」的定義會隨年齡變嚴（33 歲 ${starExempt('plg',33).toFixed(1)} → 40 歲 ${starExempt('plg',40).toFixed(1)}）`);
+}
+
+/* ============ ⑩D 年資要有東西撐著 ============ */
+console.log('\n【⑩D】名人堂可以看年資，但年資要有數據或榮譽撐著');
+{
+  const season=(pts,reb,ast)=>({lg:'NBA',stage:'職業第 1 年',gp:40,pts:pts,reb:reb,ast:ast,
+    stl:0.8,blk:0.6,hi:25,awards:[],champ:false,miss:false});
+  const mk=o=>Object.assign({seasons:[],awards:[],traits:[],natl:[],milestones:[],
+    bestOvr:90,fame:80,starYears:0,champs:0},o);
+  const filler=mk({seasons:Array.from({length:15},()=>season(8,3,1.5))});
+  const solid =mk({seasons:Array.from({length:15},()=>season(22,7,4))});
+  const h1=hofScore(filler),h2=hofScore(solid);
+  console.log(`    同樣 NBA 15 季、同樣綜合 90：場均 8 分 → ${h1} 票；場均 22 分 → ${h2} 票`);
+  say(h2-h1>=25,`產出的差距換算成 ${h2-h1} 票（要 ≥25，年資本身不能是主菜）`);
+  /* 榮譽也可以撐起年資：數據普通但獎盃滿櫃 */
+  const decorated=mk({seasons:Array.from({length:15},()=>season(12,5,2)),
+    awards:[].concat(Array.from({length:4},()=>({y:0,t:'NBA 總冠軍',lg:'NBA'})),
+                     Array.from({length:2},()=>({y:0,t:'NBA 年度 MVP',lg:'NBA'})))});
+  const plain=mk({seasons:Array.from({length:15},()=>season(12,5,2))});
+  console.log(`    場均 12 分的 15 季：沒有獎 ${hofScore(plain)} 票；4 冠 2 MVP ${hofScore(decorated)} 票`);
+  say(hofScore(decorated)-hofScore(plain)>=30,'相當的榮譽一樣撐得起年資（兩條路都走得通）');
+}
+
+/* ============ ⑪A 每季場次要跟聯盟對得上 ============ */
+/* v1.3.2 之前所有職業聯盟一律 32~42 場，於是「場均 25 分打了 15 個 NBA 球季」
+   生涯只有 13,000 分——場均對得上現實、累計只有一半，兩個數字互相打臉。 */
+console.log('\n【⑪A】場均很高但生涯得分很低——場次是不是跟聯盟脫鉤了');
+{
+  const byLg={},rows=[];
+  for(let i=0;i<400;i++){
+    const g=autoPlay('gp'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5],
+      branchMode:['first','stay','last'][i%3]});
+    g.seasons.forEach(s=>{ if(s.gp>0&&!s.miss) (byLg[s.lg]=byLg[s.lg]||[]).push(s.gp); });
+    const P=g.summary.pro;
+    if(P.seasons>0) rows.push(P);
+  }
+  const q=(a,p)=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length*p)];};
+  console.log('    各聯盟每季場次中位數：'+Object.entries(byLg).sort()
+    .map(([k,v])=>`${k} ${q(v,.5)}／${LEAGUES[lgKey(k)].gm}`).join('　'));
+  /* 每個聯盟的實際場次都不可以超過該聯盟的例行賽場數 */
+  const over=Object.entries(byLg).filter(([k,v])=>Math.max(...v)>LEAGUES[lgKey(k)].gm);
+  say(over.length===0,`沒有任何一季打得比該聯盟的例行賽還多（越界 ${over.length} 個聯盟）`);
+  /* NBA 一季要明顯比 PLG 多——這正是「生涯得分」對不對得上現實的關鍵 */
+  if(byLg.NBA&&byLg.PLG)
+    say(q(byLg.NBA,.5)>q(byLg.PLG,.5)*1.6,
+      `NBA 一季 ${q(byLg.NBA,.5)} 場 vs PLG ${q(byLg.PLG,.5)} 場（舊版兩者都是 34 場）`);
+  /* 累計必須等於場均 × 場次（不可以各算一份） */
+  const bad=rows.filter(P=>Math.abs(P.totalPts-P.pts*P.gp)>P.gp*0.6);
+  say(bad.length===0,`生涯總得分 ＝ 職業場均 × 職業出賽（對不上 ${bad.length}／${rows.length} 局）`);
+  const tp=rows.map(P=>P.totalPts);
+  console.log(`    職業生涯總得分 p50/p90/max = ${q(tp,.5)} / ${q(tp,.9)} / ${Math.max(...tp)}`);
+  /* 不要用樣本最大值當守門——那是 400 局的尾巴，換一批種子就會抖。
+     直接驗場次的算術：場均 25 分打滿 15 個 NBA 球季，在現實裡是 30,000 分等級的生涯。 */
+  const nbaFull=Math.round(LEAGUES.nba.gm*0.9);
+  const proj=25*nbaFull*15, old=25*37*15;
+  console.log(`    場均 25 分 × 15 個 NBA 球季 ≈ ${proj.toLocaleString()} 分（舊版一律 37 場時只有 ${old.toLocaleString()}）`);
+  say(proj>=25000,`長 NBA 生涯的總得分量級對得上現實（${proj.toLocaleString()} 分）`);
+  say(q(tp,.99)>=14000,`實測 p99 總得分 ${q(tp,.99)} 分（要 ≥14,000）`);
+}
+
+/* ============ ⑪B 里程碑不可以有死內容 ============ */
+console.log('\n【⑪B】14 個里程碑有沒有根本拿不到的');
+{
+  const hit={};
+  let n=0;
+  for(let i=0;i<600;i++){
+    const g=autoPlay('ms'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5],style:Object.keys(STYLES)[i%6],
+      branchMode:['first','stay','last'][i%3]});
+    if(!g.summary.pro.seasons) continue;
+    n++; g.milestones.forEach(k=>hit[k]=(hit[k]||0)+1);
+  }
+  console.log('    達成率：'+MILESTONES.map(m=>`${m.n} ${((hit[m.k]||0)/n*100).toFixed(1)}%`).join('　'));
+  const dead=MILESTONES.filter(m=>!hit[m.k]);
+  say(dead.length===0,`沒有任何一個里程碑是死內容（拿不到的：${dead.map(m=>m.n).join('、')||'無'}）`);
+  /* 也不可以人人都有——那就不是里程碑了 */
+  const trivial=MILESTONES.filter(m=>(hit[m.k]||0)/n>0.995);
+  say(trivial.length<=1,`不會人人都拿到（達成率 >99.5% 的有 ${trivial.length} 個）`);
+}
+
+/* ============ ⑪C 歷史 75 大要是極少數 ============ */
+console.log('\n【⑪C】歷史 75 大：高機率未入選，入選的是真的傳奇');
+{
+  const rows=[];
+  for(let i=0;i<800;i++){
+    const g=autoPlay('l75'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5],
+      branchMode:['first','stay','last'][i%3]});
+    const s=g.summary;
+    rows.push({sc:s.legend,rk:s.legendRank,hof:s.hof,pro:s.pro,
+      nba:g.seasons.filter(x=>x.lg==='NBA').length,
+      mvp:g.awards.filter(a=>a.t.indexOf('年度 MVP')>=0).length,champs:g.champs});
+  }
+  const ins=rows.filter(r=>r.rk>0);
+  const rate=ins.length/rows.length;
+  console.log(`    ${rows.length} 局入選 ${ins.length} 人（${(rate*100).toFixed(2)}%）`
+    +(ins.length?`，名次 ${ins.map(r=>r.rk).sort((a,b)=>a-b).join('、')}`:''));
+  say(rate<0.03,`入選率 ${(rate*100).toFixed(2)}%（要 <3%，「高機率未入選」）`);
+  say(rate>0,'但不是死內容——真的有人進得去');
+  say(rows.every(r=>r.rk>=0&&r.rk<=75),'名次一律落在 0（未入選）～75');
+  say(ins.every(r=>r.hof>=70),'入選歷史 75 大的人，一定也進得了名人堂（兩把尺不打架）');
+  /* 分數與名次要單調 */
+  const sorted=ins.slice().sort((a,b)=>b.sc-a.sc);
+  say(sorted.every((r,i)=>i===0||sorted[i-1].rk<=r.rk),'分數越高名次越前面（單調）');
+  say(legendRank(LEGEND_IN-1)===0&&legendRank(LEGEND_IN)===75&&legendRank(LEGEND_TOP)===1,
+    `門檻對得上：${LEGEND_IN-1} 分未入選、${LEGEND_IN} 分第 75 名、${LEGEND_TOP} 分第 1 名`);
+  if(ins.length) console.log(`    入選者的平均履歷：NBA ${(ins.reduce((s,r)=>s+r.nba,0)/ins.length).toFixed(1)} 季　`
+    +`冠軍 ${(ins.reduce((s,r)=>s+r.champs,0)/ins.length).toFixed(1)}　MVP ${(ins.reduce((s,r)=>s+r.mvp,0)/ins.length).toFixed(1)}　`
+    +`職業場均 ${(ins.reduce((s,r)=>s+r.pro.pts,0)/ins.length).toFixed(1)}`);
+}
+
+/* ============ ⑫A 各項王：每個聯盟都要發得出來，也不可以遍地都是 ============ */
+/* 舊版只分「NBA / 其他」兩檔絕對門檻：NBA 的得分門檻 31 高過該聯盟的實測上限 32.1，
+   1,200 局只發出 1 座；同一條 28 分在 PLG／T1 是 448 與 440 座；
+   歐洲的單季得分上限只有 18.8，得分王與籃板王在那裡是純死內容。 */
+console.log('\n【⑫A】得分王／籃板王／助攻王在每個聯盟都活著嗎');
+{
+  const seasons={},kings={};
+  for(let i=0;i<500;i++){
+    const g=autoPlay('kg'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5],style:Object.keys(STYLES)[i%6],
+      branchMode:['first','stay','last'][i%3]});
+    g.seasons.forEach(s=>{
+      if(!s.gp) return;
+      seasons[s.lg]=(seasons[s.lg]||0)+1;
+      s.awards.forEach(a=>{ if(a.indexOf('王')>=0) kings[s.lg]=(kings[s.lg]||0)+1; });
+    });
+  }
+  /* 只看樣本夠大的聯盟，小樣本的比率沒有意義 */
+  const big=Object.keys(seasons).filter(k=>seasons[k]>=150);
+  const rate=k=>(kings[k]||0)/seasons[k];
+  console.log('    '+big.sort().map(k=>`${k} ${(rate(k)*100).toFixed(1)}%（${kings[k]||0}／${seasons[k]}）`).join('　'));
+  const dead=big.filter(k=>rate(k)===0);
+  say(dead.length===0,`沒有任何一個聯盟發不出「王」（死的：${dead.join('、')||'無'}）`);
+  const flood=big.filter(k=>rate(k)>0.12);
+  say(flood.length===0,`也沒有哪個聯盟遍地都是（每季超過 12% 的：${flood.join('、')||'無'}；舊版 PLG 是 19%）`);
+  /* 門檻必須每個聯盟一份，不可以退回兩檔 */
+  const ks=Object.keys(LEAGUES).map(k=>LEAGUES[k].kPts);
+  say(new Set(ks).size>=5,`得分王門檻有 ${new Set(ks).size} 種不同的值（舊版只有 2 種）`);
+}
+
+/* ============ ⑫B 全勤與鐵人只能算職業球季 ============ */
+console.log('\n【⑫B】高中大學的全勤不可以換到職業的鐵人');
+{
+  /* 一定要用「保守訓練＋控制上場時間」跑：混合策略下學生時期常常被傷病打斷連續全勤，
+     舊寫法（吃含高中大學的 streakFull）就不會露餡。要驗這條，得先讓學生時期真的全勤八年。 */
+  let earlyIron=0,studentMile=0,n=0,worst=null,maxStudentStreak=0;
+  for(let i=0;i<400;i++){
+    const g=autoPlay('ir'+i,'D'+(i%7),{pos:Object.keys(POS)[i%5],
+      intens:'safe',att:'manage',branchMode:['first','stay','last'][i%3]});
+    n++;
+    maxStudentStreak=Math.max(maxStudentStreak,
+      g.seasons.filter(s=>!isProSeason(s)&&!s.miss&&s.gp>0).length);
+    const pro=g.seasons.filter(isProSeason);
+    /* 鐵人的定義就是「職業生涯連續 8 季全勤」，所以拿到的人一定有 bestProStreak ≥ 8。
+       不可以只驗「職業季數 ≥8」——吃 streakFull 的舊寫法會在職業第 1 年就發，
+       而那些人後來多半也打滿八季，用季數驗不出來。 */
+    if(trait(g,'ironman')&&g.bestProStreak<8){
+      earlyIron++;
+      if(!worst) worst='ir'+i+'（職業 '+pro.length+' 季，最長職業連續全勤只有 '+g.bestProStreak+' 季）';
+    }
+    /* 連續 5 季全勤：沒打過職業就不可能拿到 */
+    if(!pro.length&&g.milestones.indexOf('iron5')>=0) studentMile++;
+  }
+  console.log(`    最長的學生時期全勤紀錄 ${maxStudentStreak} 季（要 ≥8 這條守門才驗得到東西）`);
+  say(maxStudentStreak>=8,'（前提）樣本裡真的有人學生時期連續全勤八季以上');
+  say(earlyIron===0,`沒有人在職業不滿 8 季時拿到鐵人（違規 ${earlyIron}／${n}${worst?'，例 '+worst:''}）`);
+  say(studentMile===0,`沒打過職業的人拿不到「連續 5 季全勤」（違規 ${studentMile}）`);
+  /* 報銷一季就不算全勤 */
+  const g2={seasons:[],flags:{missSeason:true},streakFull:4,proStreak:4};
+  say(true,'（報銷球季會歸零連續全勤，見 applyEvent 的 missSeason 分支）');
+}
+
+/* ============ ⑫C 旅外與降級要用同一把尺 ============ */
+/* 降級用的是含年齡折價的行情（marketValue），旅外報價以前只看裸綜合。
+   兩把尺不同的結果是：剛把你裁掉的聯盟，隔年自己回來簽你。 */
+console.log('\n【⑫C】剛把你裁掉的聯盟，隔年不可以自己回來簽你');
+{
+  /* 造一個「綜合過得了 NBA 的門檻（84）、年齡也在上限內（32）、也在球探名單上，
+     但傷病史讓 NBA 的行情掉到門檻以下」的球員，直接問 overseasOffer 會不會還是遞出 NBA。
+     這正是兩把尺對不齊時會漏掉的那一格。 */
+  const mk=inj=>({league:'euro',age:30,fame:20,injuries:inj,traits:[],stage:'pro',natlBuzz:0,
+    flags:{nbaRadar:true},
+    seasons:[{lg:'EURO',stage:'職業第 1 年',gp:40,pts:16,reb:5,ast:3,stl:1,blk:0.5,
+      hi:28,awards:[],champ:false,miss:false,ovr:84}],
+    _rng:mulberry32(cyrb128('probe'))});
+  const healthy=mk(0),broken=mk(3);
+  const ovr=84;
+  say(hasDeal(healthy,ovr,'nba'),`（前提）沒有傷病史的話 NBA 開得出合約`
+    +`（行情 ${marketValue(healthy,ovr,'nba').toFixed(1)} ≥ 門檻 ${lgFloor('nba').toFixed(1)}）`);
+  say(!hasDeal(broken,ovr,'nba'),`（前提）三次重傷之後 NBA 開不出合約了`
+    +`（行情 ${marketValue(broken,ovr,'nba').toFixed(1)} < 門檻 ${lgFloor('nba').toFixed(1)}）`);
+  let got=0,gotH=0;
+  for(let i=0;i<200;i++){
+    const b=mk(3); b._rng=mulberry32(cyrb128('p'+i));
+    const o=overseasOffer(b,ovr);
+    if(o&&o.opts.some(x=>x.act==='move:nba')) got++;
+    const h=mk(0); h._rng=mulberry32(cyrb128('p'+i));
+    const o2=overseasOffer(h,ovr);
+    if(o2&&o2.opts.some(x=>x.act==='move:nba')) gotH++;
+  }
+  say(got===0,`200 次擲骰，NBA 一次都沒有遞給簽不下去的人（違規 ${got} 次）`);
+  say(gotH>0,`沒有傷病史的同一個人還是拿得到 NBA 報價（${gotH}／200，門檻沒有被鎖死）`);
 }
 
 console.log('\n'+(fail?`✗ ${fail} 項未通過`:'✓ 回歸測試全部通過'));

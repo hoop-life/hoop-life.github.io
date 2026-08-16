@@ -316,7 +316,10 @@ say(has('#startBtn'),'「再來一次」回到開場畫面');
 /* --- 7. 第二輪：走到職業生涯後段，驗退休流程真的有得選 --- */
 console.log('\n  ── 第二輪：刻意打完整個職業生涯 ──');
 {
-  d.querySelector('#seedIn').value='y4wub9da';
+  /* 這顆種子在目前的平衡下，用「正常訓練＋全力衝刺＋事件與分岔都選第一個」
+     可以走完 15 個職業球季、37 歲退休（換平衡之後要重新挑一顆，
+     判準是：有領到年薪、職業 10 季以上、retiredWhy 不是 undrafted）。 */
+  d.querySelector('#seedIn').value='y1wub9da';
   click('.posbtn[data-pos="SF"]');
   click('.stybtn[data-sty="slasher"]');
   click('#startBtn');

@@ -116,7 +116,9 @@ say(avgPts>4&&avgPts<22, `生涯場均得分平均 ${avgPts.toFixed(2)}（期望
 say(agg.maxPts<40, `最高生涯場均 ${agg.maxPts.toFixed(1)}（應 < 40）`);
 say(avgSeasons>8&&avgSeasons<26, `平均生涯季數 ${avgSeasons.toFixed(1)}（期望 8~26）`);
 const hofRate=agg.hofIn/agg.n*100;
-say(hofRate>0.5&&hofRate<40, `名人堂入選率 ${hofRate.toFixed(1)}%（期望 0.5%~40%，要稀有但做得到）`);
+/* 上界從 40% 收到 15%：v1.2.0 的 22% 曾經通過這道守門，但那個 22% 正是
+   「場均十幾分也能進名人堂」的病徵。名人堂要稀有到值得追，但不能變成不可能。 */
+say(hofRate>0.5&&hofRate<15, `名人堂入選率 ${hofRate.toFixed(1)}%（期望 0.5%~15%，要稀有但做得到）`);
 const nbaRate=agg.nba/agg.n*100, osRate=agg.overseas/agg.n*100;
 say(nbaRate>0&&nbaRate<25, `打進 NBA 比率 ${nbaRate.toFixed(1)}%（要很難但不能是 0）`);
 say(osRate>5&&osRate<95, `有出過國比率 ${osRate.toFixed(1)}%（厲害的才能出國）`);
@@ -129,13 +131,15 @@ console.log('\n  評價分佈：', Object.entries(agg.grades).sort().map(([k,v])
 console.log('  待過聯盟：', Object.entries(agg.leagues).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k}:${v}`).join('  '));
 
 /* ---------- 4. 特質可達性 ---------- */
-console.log('\n[4] 25 個特質是否都拿得到');
+/* 數量一律讀 TRAITS 本身，不要寫死——寫死的那個數字遲早跟實際的特質數對不上 */
+const TRAIT_N=Object.keys(TRAITS).length;
+console.log(`\n[4] ${TRAIT_N} 個特質是否都拿得到`);
 const unreachable=Object.keys(TRAITS).filter(t=>!agg.traitCount[t]);
 console.log('  已觸發：', Object.entries(agg.traitCount).sort((a,b)=>b[1]-a[1])
   .map(([k,v])=>`${TRAITS[k].n}:${v}`).join('  ')||'（無）');
 say(unreachable.length<=6, unreachable.length
   ? `未觸發 ${unreachable.length} 個：${unreachable.map(t=>TRAITS[t].n).join('、')}`
-  : '25 個特質全部可達');
+  : `${TRAIT_N} 個特質全部可達`);
 
 /* ---------- 5. 旅外門檻真的擋得住 ---------- */
 console.log('\n[5] 旅外門檻');

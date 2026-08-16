@@ -7,7 +7,9 @@
     "build": "node build-standalone.js index.html",
     "test": "node verify.js && node regress.js && node audit.js && node smoke.js && node smoke-standalone.js index.html",
     "test:engine": "node verify.js && node regress.js && node audit.js",
-    "test:dom": "node smoke.js && node smoke-standalone.js index.html"
+    "test:dom": "node smoke.js && node smoke-standalone.js index.html",
+    "calib": "node calib.js",
+    "stats": "node stats.js"
   },
   "devDependencies": {
     "jsdom": "^29.1.1"

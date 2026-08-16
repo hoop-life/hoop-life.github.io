@@ -21,6 +21,8 @@
 | `index.html` | 由 `npm run build` 產生的成品，不要手改 |
 | `build-standalone.js` | 把原始碼包上 HTML 外殼 |
 | `verify.js` / `regress.js` / `audit.js` / `smoke.js` / `smoke-standalone.js` | 五套測試 |
+| `calib.js` | 不是測試，是產生器：`npm run calib` 重算生涯指數的 `CI_K` 與 `CI_PCTL` |
+| `stats.js` | 不是測試，是量測：`npm run stats` 印出單季／生涯各項數據的 PR 分佈與名人堂機率 |
 | `遊戲設計.md` | 玩法、系統、每個機制在做什麼 |
 | `數值設定.md` | 所有常數表與公式（改數值前先看這份） |
 | `開發指南.md` | 建置、測試、部署，以及不可以踩的地雷 |
@@ -45,6 +47,10 @@
 所有成功率一律經過 `draftOdds()` 這類單一來源函式，畫面與擲骰共用。
 `regress.js` 有統計檢定盯著「顯示平均值」與「實際命中率」的差距（容許 3 個百分點）。
 不可以「畫面寫 70%、程式另外算一份」。
+
+結算頁的生涯指數 PR 也算在這條裡面：那張 `CI_PCTL` 分位表是 `npm run calib`
+量出來的實測分佈。**動到任何影響計分的東西就要重跑再貼回去**，
+不然畫面上的 PR 是舊世界的 PR（`regress.js` ⑨E 會抓）。
 
 ### 3. 文案不可以跟機制矛盾
 
