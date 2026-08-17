@@ -6,5 +6,6 @@ const fs=require('fs'),vm=require('vm'),path=require('path');
 const html=fs.readFileSync(path.join(__dirname,'hooplife.html'),'utf8');
 const m=html.match(/<script id="engine">([\s\S]*?)<\/script>/);
 if(!m){ console.error('FAIL: 找不到 engine script'); process.exit(1); }
+const auto=fs.readFileSync(path.join(__dirname,'autoplay-body.js'),'utf8');
 const body=fs.readFileSync(path.join(__dirname,'calib-body.js'),'utf8');
-vm.runInThisContext(m[1]+'\n'+body,{filename:'hooplife-engine+calib.js'});
+vm.runInThisContext(m[1]+'\n'+auto+'\n'+body,{filename:'hooplife-engine+calib.js'});

@@ -2,7 +2,7 @@
 /* 用一顆「決策種子」自動玩，模擬玩家的固定選擇序列 */
 function autoPlay(seed, decisionSeed, opts){
   opts=opts||{};
-  const drng=mulberry32(cyrb128('dec|'+decisionSeed));
+  const drng=mulberry32(cyrb32('dec|'+decisionSeed));
   const g=createGame(seed, opts.name||'測試員', opts.pos||'SF');
   const trace=[];
   let guard=0;
@@ -13,20 +13,8 @@ function autoPlay(seed, decisionSeed, opts){
     if(p.type==='train'){
       const ints=['push','normal','safe'];
       const it=ints[Math.floor(drng()*3)];
-      const pts=trainPoints(g,it);
-      /* 依位置權重貪婪分配 */
-      const alloc={};
-      const w=POS[g.pos].w;
-      for(let i=0;i<pts;i++){
-        let best=null,bs=-1;
-        for(const at of ATTRS){
-          if(g.a[at.k]>=g.pot[at.k]) continue;
-          const s=(w[at.k]||0.01)*gainFor(g,at.k,alloc[at.k]||0);
-          if(s>bs){bs=s;best=at.k;}
-        }
-        if(!best) break;
-        alloc[best]=(alloc[best]||0)+1;
-      }
+      /* 依位置權重貪婪分配——用引擎的 greedyAlloc，跟 UI 的「自動分配」按鈕同一份 */
+      const alloc=greedyAlloc(g,trainPoints(g,it));
       const atts=['allin','steady','manage'];
       const att=atts[Math.floor(drng()*3)];
       trace.push('T:'+it+':'+att+':'+JSON.stringify(alloc));
@@ -123,7 +111,10 @@ const nbaRate=agg.nba/agg.n*100, osRate=agg.overseas/agg.n*100;
 say(nbaRate>0&&nbaRate<25, `打進 NBA 比率 ${nbaRate.toFixed(1)}%（要很難但不能是 0）`);
 say(osRate>5&&osRate<95, `有出過國比率 ${osRate.toFixed(1)}%（厲害的才能出國）`);
 const minAge=Math.min(...agg.retireAges), maxAge=Math.max(...agg.retireAges);
+/* maxAge<=45 那半邊是 retireForced 的 hardCap（g.age>=42）保證的，驗不到東西。
+   真正有語意的是「退休年齡有拉得開」——全部擠在同一歲代表生涯長度變成常數。 */
 say(minAge>=19&&maxAge<=45, `退休年齡範圍 ${minAge}~${maxAge}`);
+say(maxAge-minAge>=10, `退休年齡真的有分佈（跨度 ${maxAge-minAge} 歲，要 ≥10）`);
 const RA=agg.retireAges.slice().sort((x,y)=>x-y);
 console.log("  退休年齡 p10/p50/p90："+[.1,.5,.9].map(q=>RA[Math.floor(RA.length*q)]).join(" / "));
 
@@ -137,7 +128,9 @@ console.log(`\n[4] ${TRAIT_N} 個特質是否都拿得到`);
 const unreachable=Object.keys(TRAITS).filter(t=>!agg.traitCount[t]);
 console.log('  已觸發：', Object.entries(agg.traitCount).sort((a,b)=>b[1]-a[1])
   .map(([k,v])=>`${TRAITS[k].n}:${v}`).join('  ')||'（無）');
-say(unreachable.length<=6, unreachable.length
+/* 上限收到 1：唯一刻意拿不到的是「史上第一人」（全部生涯 0.033%，而且 regress ⑪C
+   有純函式在守它真的發得出來）。放 6 等於留 5 個名額給悄悄變成死內容的特質。 */
+say(unreachable.length<=1, unreachable.length
   ? `未觸發 ${unreachable.length} 個：${unreachable.map(t=>TRAITS[t].n).join('、')}`
   : `${TRAIT_N} 個特質全部可達`);
 

@@ -1,6 +1,6 @@
 {
   "name": "hooplife",
-  "version": "1.0.0",
+  "version": "1.7.0",
   "private": true,
   "description": "HoopLife 籃球人生 — 台灣籃球生涯模擬器（單一 HTML 檔，零外部相依）",
   "scripts": {

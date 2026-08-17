@@ -6,7 +6,10 @@
 
 ## 玩
 
-用瀏覽器打開 `index.html` — 雙擊即可，不需要伺服器。
+<https://hoop-life.github.io>
+
+也可以下載 `index.html` 用瀏覽器打開 — 雙擊即可，不需要伺服器
+（但 `file://` 下不會出現「複製這局的連結」）。
 
 ## 這是什麼
 
@@ -16,14 +19,16 @@
 
 最後結算三把尺：**生涯指數**（0～20,000，破萬 ＝ PR 80）、**名人堂票數**（門檻 70）、
 **歷史 75 大球星**（入選率 0.5%，絕大多數是未入選），外加生涯評價 S～F。
+入選那份名單會拿到「歷史球星」特質，名次剛好第 1 再多一個「史上第一人」。
 
 **同一顆種子 ＋ 同樣的選擇 ＝ 同一段人生。** 種子可以分享。
 
-推薦種子（開局天賦最高的幾顆，約 100～8700 顆才出一顆）：
+推薦種子（開局天賦最高的幾顆，約 100～8700 顆才出一顆。天賦上限受位置與球風影響，
+下面的數字是以開場預設的**小前鋒／全能型**量的）：
 
 ```
-uf3minda   天賦 99 / 體質 98   除了體能之外全部 99
-mhkq46aa   天賦 98 / 體質 96   投傳防體球商 99，身材最高
+uf3minda   天賦 99 / 體質 98   投三運防球商心理 99，傳球 95、籃板 91、體能只有 84
+mhkq46aa   天賦 98 / 體質 96   投傳防體球商 99，中鋒可以長到 214 公分
 7dmsy2ba   天賦 98 / 體質 100  體質滿分，幾乎不會受傷
 6dkts3aa   天賦 97 / 體質 98   九項全部 97 以上，沒有短板
 wxzg77aa   天賦 97 / 體質 99   禁區怪物
@@ -45,7 +50,7 @@ wxzg77aa   天賦 97 / 體質 99   禁區怪物
 npm install        # 只需要 jsdom（給 DOM 測試用）
 npm test           # 五套測試
 npm run build      # hooplife.html → index.html
-npm run calib      # 只有動到計分才需要：重算生涯指數的校準係數與 PR 分位表
+npm run calib      # 只有動到計分才需要：重算 CI_K／CI_PCTL／LEGEND_IN／LEGEND_SC
 ```
 
 改東西一律改 `hooplife.html`，`index.html` 是產生出來的。
@@ -63,6 +68,8 @@ npm run calib      # 只有動到計分才需要：重算生涯指數的校準�
 | `node smoke-standalone.js` | 單機外殼：doctype／編碼／viewport／clipboard 退路 |
 
 ## 部署
+
+現在掛在 GitHub Pages：<https://hoop-life.github.io>，push 到 `master` 就自動上線。
 
 `index.html` 丟到任何靜態主機都能跑。GitHub Pages、Netlify、Cloudflare Pages
 都不需要任何建置設定。

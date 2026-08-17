@@ -1,0 +1,28 @@
+name: test
+
+# 整套測試在本機跑完約 24 秒，push 與 PR 上跑都不痛。
+# 沒有這個 workflow 的話，「改壞公布過的種子」到「壞掉的版本上線」之間
+# 沒有任何一道自動關卡——npm test 只有人記得跑才會跑。
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      # 五套測試。audit.js 現在會 exit 1，所以鐵律 1 的守門真的擋得住。
+      # smoke-standalone.js 開頭會把 hooplife.html 重新包一次跟 index.html 比對，
+      # 忘記 build 就會在這裡轉紅。
+      - run: npm test
+      # 再保險一層：commit 進去的成品必須跟現在的原始碼一致。
+      # build 對同一份原始碼是位元決定性的，所以沒有差異才是正常。
+      - run: npm run build
+      - run: git diff --exit-code index.html

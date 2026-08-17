@@ -2,77 +2,18 @@
    以及名人堂與歷史 75 大的機率。
 
    兩個參考分佈（同一套引擎、不同的玩家）：
-   ① 隨手玩 casual —— 跟 calib-body.js 一模一樣（5 位置 × 3 分岔策略，訓練／態度／事件全隨機）。
+   ① 隨手玩 casual —— 就是 calib 用的那一支 autoPlay（5 位置 × 3 分岔策略，訓練／態度／事件全隨機）。
       這是 CI_PCTL 那張分位表的定義來源，所以這一欄的生涯指數分位必須對得上引擎裡的表。
-   ② 認真玩 serious —— 跟 audit.js 的 play() 一模一樣（貪婪分配點數、分岔一路往上爬）。
+   ② 認真玩 serious —— 就是 audit 用的那一支 autoPlaySerious（貪婪分配點數、分岔一路往上爬）。
       這是「知道怎麼玩的人」會拿到的分佈。
 
    兩欄一起看才知道平不平衡：差距太小＝玩得好沒有回報，差距太大＝隨手玩沒東西可看。 */
 const N=parseInt(process.env.N||'6000',10);
 
-/* ── 玩家 ① 隨手玩（＝ calib-body.js 的 autoPlay，一個字都不能改） ── */
-function playCasual(seed,dseed,opt){
-  opt=opt||{};
-  const drng=mulberry32(cyrb128('dec|'+dseed));
-  const g=createGame(seed,'測試員',opt.pos||'SF',opt.style);
-  let guard=0;
-  while(g.phase!=='end'){
-    if(++guard>400) throw new Error('卡關');
-    const p=g.pending;
-    if(p.type==='train'){
-      const it=['push','normal','safe'][Math.floor(drng()*3)];
-      const att=['allin','steady','manage'][Math.floor(drng()*3)];
-      const pts=trainPoints(g,it),alloc={},w=POS[g.pos].w;
-      for(let i=0;i<pts;i++){ let b=null,bs=-1;
-        for(const at of ATTRS){ if(g.a[at.k]>=g.pot[at.k])continue;
-          const s=(w[at.k]||0.01)*gainFor(g,at.k,alloc[at.k]||0); if(s>bs){bs=s;b=at.k;} }
-        if(!b)break; alloc[b]=(alloc[b]||0)+1; }
-      applyTrain(g,it,alloc,att);
-    }
-    else if(p.type==='event') applyEvent(g,Math.floor(drng()*p.opts.length));
-    else if(p.type==='result') advance(g);
-    else if(p.type==='branch'){
-      let i=0;
-      if(opt.branchMode==='stay') p.opts.forEach((o,k)=>{ if(o.act==='stay'||(o.act||'').indexOf('move:')===0) i=k; });
-      else if(opt.branchMode==='last') i=p.opts.length-1;
-      applyBranch(g,i);
-    }
-    else break;
-  }
-  return g;
-}
-
-/* ── 玩家 ② 認真玩（＝ audit.js 的 play()） ── */
-function playSerious(sd,posIdx,style){
-  const g=createGame(sd,'測',Object.keys(POS)[posIdx%5],style);
-  let guard=0;
-  while(g.phase!=='end'){
-    if(++guard>500) break;
-    const p=g.pending;
-    if(p.type==='train'){
-      const it=g.load<62?'push':(g.load<82?'normal':'safe');
-      const pts=trainPoints(g,it),a={},acc={},w=POS[g.pos].w;
-      for(let i=0;i<pts;i++){ let b=null,bs=-1,bg=0;
-        for(const at of ATTRS){ const g0=gainFor(g,at.k,acc[at.k]||0);
-          if(g0<=0) continue;
-          const s=(w[at.k]||0.01)*g0; if(s>bs){bs=s;b=at.k;bg=g0;} }
-        if(!b)break; a[b]=(a[b]||0)+1; acc[b]=(acc[b]||0)+bg; }
-      applyTrain(g,it,a,g.load<74?'allin':'steady');
-    }
-    else if(p.type==='event') applyEvent(g,0);
-    else if(p.type==='result') advance(g);
-    else if(p.type==='branch'){
-      let bi=0,bs=-1;
-      p.opts.forEach((o,i)=>{ const x=o.act||'';
-        const s=x.indexOf('move:')===0?100+LEAGUES[x.slice(5)].tier
-          :x==='nbaDraft'?99:x==='goNCAA'?98:x==='tryJapan'?90:x==='goDraft'?60
-          :x==='stay'?50:x.indexOf('natl:')===0?78+(o.p||0)*8:x==='resign'?48:20;
-        if(s>bs){bs=s;bi=i;} });
-      applyBranch(g,bi);
-    } else break;
-  }
-  return g;
-}
+/* 兩個玩家的定義在 autoplay-body.js（stats.js 會把它串在這個檔前面）——
+   跟 calib 與 audit 用的是同一份，不再各抄一次。 */
+const playCasual=(seed,dseed,opt)=>autoPlay(seed,dseed,opt);
+const playSerious=(sd,posIdx,style)=>autoPlaySerious(sd,posIdx,style);
 
 /* ── 統計小工具 ── */
 /* 分位數的取法跟 calib-body.js 一致（floor 取樣），不然這裡的 CI 分位會跟引擎的表對不起來 */
@@ -124,6 +65,7 @@ for(const key of Object.keys(arms)){
       bestPts:P.bestPts, hi:P.hi,
       nba:g.seasons.filter(x=>x.lg==='NBA').length,
       abroad:g.seasons.some(x=>['B1','KBL','NBL','EURO','GLG','NBA','NCAA'].indexOf(x.lg)>=0),
+      why:g.retiredWhy||'(空)', age:g.age,
     };
   });
   A.pro=A.rows.filter(r=>r.proSeasons>0);
@@ -200,6 +142,39 @@ console.log('\n══════ 【C】生涯數據（職業口徑：只算打
   ];
   table('','',ITEMS,it=>arms.casual.pro.map(r=>r[it.k]||0),it=>arms.serious.pro.map(r=>r[it.k]||0));
 }
+/* 【C2】淘汰：生涯是怎麼結束的 */
+console.log('\n──── 淘汰：生涯是怎麼結束的 ────');
+{
+  const WHY={undrafted:'選秀落選，沒踏進職業',washed:'30 歲前掉出所有聯盟（實力不夠）',
+             nomarket:'年紀到了，沒有球隊再打電話',broken:'傷退',age:'42 歲硬上限',
+             choice:'自己決定收山','(空)':'其他'};
+  console.log('  '+padR('',30)+padL('隨手玩',12)+padL('認真玩',12));
+  for(const k of ['undrafted','washed','nomarket','broken','age','choice','(空)']){
+    const c=arms.casual.rows.filter(r=>r.why===k).length;
+    const s=arms.serious.rows.filter(r=>r.why===k).length;
+    if(!c&&!s) continue;
+    console.log('  '+padR(WHY[k]||k,30)+padL((c/N*100).toFixed(1)+'%',12)+padL((s/N*100).toFixed(1)+'%',12));
+  }
+  const line=(n,a,b)=>console.log('  '+padR(n,30)+padL(a,12)+padL(b,12));
+  const sh=(A,k)=>(A.pro.filter(r=>r.proSeasons<=k).length/A.pro.length*100).toFixed(1)+'%';
+  line('職業 3 季內結束',sh(arms.casual,3),sh(arms.serious,3));
+  line('職業 6 季內結束',sh(arms.casual,6),sh(arms.serious,6));
+  line('退休年齡 PR10',q(arms.casual.pro.map(r=>r.age),.1),q(arms.serious.pro.map(r=>r.age),.1));
+  line('退休年齡 PR50',q(arms.casual.pro.map(r=>r.age),.5),q(arms.serious.pro.map(r=>r.age),.5));
+  /* 生涯長度該不該跟實力連動：把巔峰綜合分成三段，看退休年齡差多少 */
+  for(const key of ['casual','serious']){
+    const rows=arms[key].pro.slice().sort((a,b)=>a.bestOvr-b.bestOvr);
+    const t=Math.floor(rows.length/3);
+    const avg=a=>a.reduce((s,x)=>s+x.age,0)/a.length;
+    const lo=rows.slice(0,t),hi=rows.slice(-t);
+    if(key==='casual') console.log('  ── 生涯長度 vs 實力（依巔峰綜合分三段）──');
+    console.log('  '+padR(arms[key].label,10)
+      +`弱組（巔峰 ${q(lo.map(r=>r.bestOvr),.5)}）退休 ${avg(lo).toFixed(1)} 歲、職業 ${q(lo.map(r=>r.proSeasons),.5)} 季　`
+      +`強組（巔峰 ${q(hi.map(r=>r.bestOvr),.5)}）退休 ${avg(hi).toFixed(1)} 歲、職業 ${q(hi.map(r=>r.proSeasons),.5)} 季　`
+      +`差 ${(avg(hi)-avg(lo)).toFixed(1)} 年`);
+  }
+}
+
 /* 榮譽的稀有度：PR90 看不到的東西（MVP 中位數永遠是 0），要用機率講 */
 console.log('\n──── 榮譽稀有度（打過職業的人生裡，一輩子至少拿過一次的比例）────');
 {
@@ -269,7 +244,8 @@ console.log('\n══════ 【D】名人堂與生涯評價 ════�
 /* 【E】歷史 75 大 */
 console.log('\n══════ 【E】歷史 75 大球星 ══════');
 {
-  console.log(`  入選門檻 LEGEND_IN=${LEGEND_IN}（第 75 名）　榜首門檻 LEGEND_TOP=${LEGEND_TOP}（第 1 名）`);
+  const LG_TOP=LEGEND_SC[LEGEND_SC.length-1];
+  console.log(`  入選門檻 LEGEND_IN=${LEGEND_IN}（第 75 名）　榜首門檻 ${LG_TOP}（第 1 名）`);
   console.log('  '+padR('',16)+padL('隨手玩',14)+padL('認真玩',14));
   const line=(n,a,b)=>console.log('  '+padR(n,16)+padL(a,14)+padL(b,14));
   const inOf=A=>A.rows.filter(r=>r.lrank>0);
@@ -280,7 +256,7 @@ console.log('\n══════ 【E】歷史 75 大球星 ══════'
   line('分數 PR99',Math.round(q(arms.casual.rows.map(r=>r.legend),.99)),Math.round(q(arms.serious.rows.map(r=>r.legend),.99)));
   line('分數 PR99.9',Math.round(q(arms.casual.rows.map(r=>r.legend),.999)),Math.round(q(arms.serious.rows.map(r=>r.legend),.999)));
   line('分數最大值',maxOf(arms.casual.rows.map(r=>r.legend)),maxOf(arms.serious.rows.map(r=>r.legend)));
-  line('爆表（>榜首門檻）',ci.filter(r=>r.legend>LEGEND_TOP).length,si.filter(r=>r.legend>LEGEND_TOP).length);
+  line('爆表（>榜首門檻）',ci.filter(r=>r.legend>LG_TOP).length,si.filter(r=>r.legend>LG_TOP).length);
   const all=[...ci,...si].map(r=>r.lrank).sort((a,b)=>a-b);
   if(all.length){
     const hist={};
@@ -320,9 +296,35 @@ console.log('\n══════ 【F】平衡診斷 ══════');
   const lr=arms.casual.rows.filter(r=>r.lrank>0).length/N*100;
   const lr2=arms.serious.rows.filter(r=>r.lrank>0).length/N*100;
   say(lr>=0.3&&lr<=0.9,`歷史 75 大入選率：隨手 ${lr.toFixed(2)}%（設計值 0.5%，LEGEND_IN 就是照這條校準的）　認真 ${lr2.toFixed(2)}%`);
-  const over75=[...arms.casual.rows,...arms.serious.rows].filter(r=>r.legend>LEGEND_TOP).length;
-  const in75=[...arms.casual.rows,...arms.serious.rows].filter(r=>r.lrank>0).length;
-  say(in75===0||over75/in75<=0.10,`歷史 75 大名次沒有塞車：分數超過 LEGEND_TOP=${LEGEND_TOP} 的有 ${over75}／${in75} 人（${in75?(over75/in75*100).toFixed(1):0}%，超過就全部並列第 1 名）`);
+  const all75=[...arms.casual.rows,...arms.serious.rows].filter(r=>r.lrank>0);
+  const r1=all75.filter(r=>r.lrank===1).length;
+  say(!all75.length||(r1/all75.length<=0.02),
+    `歷史第 1 名沒有塞車：${r1}／${all75.length} 位入選者（${all75.length?(r1/all75.length*100).toFixed(2):0}%，上限 2%，舊版線性映射是 13.4%）`);
+  /* 淘汰：這三條是 v1.4.0 的重點，退化了要看得出來 */
+  const cpro=arms.casual.pro;
+  const short6=cpro.filter(r=>r.proSeasons<=6).length/cpro.length*100;
+  say(short6>=6&&short6<=30,`職業六季內出局 ${short6.toFixed(1)}%（淘汰要存在，但不能變成主流）`);
+  /* 這裡以前寫「職業年資 PR10 ≤ 8」，跟上一條在守同一件事（尾巴夠不夠厚），
+     而且 PR10 落在 8 還是 9 只看尾巴剛好在 10% 的上面還下面。
+     批 3 量出來的病不是尾巴太薄，是**尾巴擠在同一年**：v1.4.0～v1.5.0 的名單線
+     豁免三季再一次結清，六季內出局的人有 85.1% 剛好死在第三季末。
+     所以改成量症狀（`regress.js` ①c 有同一條，兩邊要說同一件事）。 */
+  {
+    const early=cpro.filter(r=>r.proSeasons<=8);
+    const byYear={}; early.forEach(r=>{ byYear[r.proSeasons]=(byYear[r.proSeasons]||0)+1; });
+    const worst=Math.max(0,...Object.keys(byYear).map(k=>byYear[k]));
+    say(early.length>0&&worst/early.length<=0.62,
+      `早退不是一根柱子：≤8 季出局 ${early.length} 人，最集中的那一年佔 `
+      +`${early.length?(worst/early.length*100).toFixed(0):'—'}%（要 ≤62%，v1.5.0 是 85%）`);
+  }
+  {
+    const rows=cpro.slice().sort((a,b)=>a.bestOvr-b.bestOvr),t=Math.floor(rows.length/3);
+    const avg=a=>a.reduce((s,x)=>s+x.age,0)/a.length;
+    const gap=avg(rows.slice(-t))-avg(rows.slice(0,t));
+    say(gap>=4,`生涯長度跟實力連動：強組比弱組多打 ${gap.toFixed(1)} 年（要 ≥4 年；舊版只有 3.0 年）`);
+  }
+  const prorate=cpro.length/N*100;
+  say(prorate>=70&&prorate<=90,`打進職業的比例 ${prorate.toFixed(1)}%（舊版 93.9%，選秀那一關等於不存在）`);
   const GR='SABCDEF'.split('');
   const missing=GR.filter(gk=>!arms.casual.rows.some(r=>r.grade===gk)&&!arms.serious.rows.some(r=>r.grade===gk));
   say(missing.length===0,`七個評價等級都拿得到（缺 ${missing.join('/')||'無'}）`);

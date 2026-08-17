@@ -1,8 +1,19 @@
 /* 單機版（完整 HTML 外殼）能不能真的跑起來——包括 file:// 情境下沒有 clipboard 的路徑 */
-const fs=require('fs'),{JSDOM}=require('jsdom');
+const fs=require('fs'),path=require('path'),{JSDOM}=require('jsdom');
 const p=process.argv[2]||'c:/project/HoopLife/index.html';
 const html=fs.readFileSync(p,'utf8');
 let fail=0; const say=(ok,m)=>{ console.log((ok?'  PASS  ':'  FAIL  ')+m); if(!ok) fail++; };
+
+/* npm test 從不跑 build，底下所有斷言驗的都是「可能已經過期的」index.html。
+   實測：只改 hooplife.html 的亂數順序不重建，這支照樣 exit 0，
+   而兩份檔案的 6dkts3aa 已經是不同的人。外殼樣板向 build-standalone.js 借，
+   不要在這裡再抄一份。 */
+{
+  const {buildHtml,SRC}=require('./build-standalone.js');
+  const fresh=buildHtml(fs.readFileSync(SRC,'utf8'));
+  say(fresh===html,`${path.basename(p)} 是最新的 build`
+    +(fresh===html?'':'——hooplife.html 改過但沒有重新 npm run build，這份成品是舊世界'));
+}
 
 const errs=[];
 const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://x.test/'});
@@ -16,6 +27,23 @@ say(!!d.querySelector('meta[name="viewport"]'),'有 viewport meta（手機上不
 say(d.documentElement.lang==='zh-Hant','html lang 標了正體中文');
 say(!!d.querySelector('link[rel="icon"]'),'有 favicon');
 say(d.title.indexOf('HoopLife')>=0,`標題正確（${d.title}）`);
+/* 版本號要有單一來源：成品裡帶得出來，而且跟 package.json 對得上。
+   package-lock.json 也算一處——它會被 CI 的 npm ci 讀進去，改版時最容易被忘掉
+   （實測 v1.4.2 就漏了，lock 還停在 1.0.0）。 */
+{
+  const meta=d.querySelector('meta[name="version"]');
+  const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,'package.json'),'utf8')).version;
+  const lockRaw=(()=>{ try{ return JSON.parse(fs.readFileSync(path.join(__dirname,'package-lock.json'),'utf8')); }catch(e){ return null; } })();
+  const lock=lockRaw?lockRaw.version:null;
+  const eng=(fs.readFileSync(path.join(__dirname,'hooplife.html'),'utf8')
+    .match(/const VERSION='([^']+)'/)||[])[1];
+  say(!!meta&&meta.content===eng&&eng===pkg&&(!lockRaw||lock===pkg),
+    `版本號四處一致（成品 ${meta?meta.content:'無'}／原始碼 ${eng}／package.json ${pkg}／lock ${lock||'無'}）`);
+  /* 玩家也要看得到。只放在 <meta> 裡的話，別人回報「這顆種子跟你寫的不一樣」時
+     問不出他玩的是哪一版，而種子的承諾本來就只在同一個版本內成立。 */
+  const shown=(d.querySelector('.hint.ver')||{}).textContent||'';
+  say(shown.indexOf('v'+eng)>=0,`開場畫面看得到版本號（${shown.trim().slice(0,20)||'找不到'}）`);
+}
 say(!/<html[\s>]/i.test(html.slice(html.indexOf('<html')+5)),'外殼只有一層，沒有包兩次');
 
 /* 真的跑得起來：開場畫面要生得出來 */

@@ -1,0 +1,10 @@
+# smoke-standalone.js 會逐位元組比對 index.html 與 build-standalone.js 現場產生的字串，
+# 而 buildHtml 產生的一律是 LF。開發機如果是 Windows 且 core.autocrlf=true，
+# 一次全新 clone 就會把 index.html 換成 CRLF，於是 npm test 會報
+# 「index.html 不是最新的 build（改完 hooplife.html 要跑 npm run build）」——
+# 訊息完全指錯方向，而原始碼一個字都沒改。
+# 這個專案的產出就是文字檔，一律 LF，工作目錄也是 LF。
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
